@@ -66,12 +66,12 @@ steps in plain language and run commands for them where possible.
   the bottom. It is `LegacyNav` in `src/GlobalNav.tsx`. The Canvas logo at the top is a text
   placeholder. Light and Dark use the floating card nav described above.
 - **Course menu.** A page inside a course passes `course={{ name, items }}` to `DesktopWrapper`
-  (items: `label`, `unpublished`, `current`). In Light and Dark that menu (Home, Announcements, ...
-  with an eye icon on unpublished items and a check on the current one) is the first level of the
-  Courses sub navigation, with a "‹ Courses" back button to the course list, and the page must NOT
-  draw its own course menu. In Legacy there is no sub navigation at all (no strip, no panel, no
-  chevron on Courses) and the page draws the course menu itself on the left, as Canvas does today.
-  See `src/CourseRollover.tsx` for both.
+  (items: `label`, `unpublished`, `current`; `src/sampleCourse.ts` has a sample). The wrapper does
+  the rest, so the page must NOT draw its own course menu. In Light and Dark the menu (with an eye
+  icon on unpublished items and a check on the current one) is the first level of the Courses sub
+  navigation, with a "‹ Courses" back button to the course list. In Legacy there is no sub
+  navigation (no strip, no panel, no chevron on Courses). The wrapper draws the menu as a secondary
+  navigation column of plain blue links with eye icons next to the dark bar (`LegacyCourseMenu`).
 - **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
   in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
   Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.

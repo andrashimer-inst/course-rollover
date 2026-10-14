@@ -10,6 +10,7 @@ import {
 } from '@instructure/ui/v11_7'
 import DesktopWrapper from './DesktopWrapper'
 import FigmaAlert from './FigmaAlert'
+import { SAMPLE_COURSE } from './sampleCourse'
 import { AppThemeContext, THEMES } from './appTheme'
 import type { ThemeKey } from './appTheme'
 
@@ -25,6 +26,7 @@ export default function App() {
           pageTitle="Courses"
           breadcrumb={['Home']}
           activeNav="Courses"
+          course={SAMPLE_COURSE}
           fullWidth
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

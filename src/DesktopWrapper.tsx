@@ -13,6 +13,7 @@ import {
 } from '@instructure/ui/v11_7'
 import GlobalNav from './GlobalNav'
 import type { CourseNav, NavKey } from './GlobalNav'
+import LegacyCourseMenu from './LegacyCourseMenu'
 import { useSurfaceTokens } from './appTheme'
 
 // Desktop wrapper built only from InstUI components, following the Figma "Wrapper Guide" and the
@@ -27,7 +28,8 @@ export type DesktopWrapperProps = {
   pageTitle: string
   breadcrumb?: string[]
   activeNav?: NavKey
-  // The course the user is in. In Light and Dark its menu appears in the Courses sub navigation.
+  // The course the user is in. Light and Dark show its menu in the Courses sub navigation; Legacy
+  // shows it as a secondary navigation column of blue links (drawn by the wrapper).
   course?: CourseNav
   // false: content is capped at the Figma max width (1100px). true: fills the space between panels.
   fullWidth?: boolean
@@ -83,6 +85,8 @@ export default function DesktopWrapper({
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: t.pageColor }}>
       <GlobalNav activeNav={activeNav} course={course} />
+      {/* Legacy: the course menu is a secondary navigation column of blue links */}
+      {course && t.key === 'legacy' && <LegacyCourseMenu course={course} />}
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         {/* Container: 32px padding around the main container */}
