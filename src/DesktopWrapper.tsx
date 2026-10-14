@@ -69,6 +69,7 @@ export default function DesktopWrapper({
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <div className="sidenav-shell" style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
       <SideNavBar
         label="Main navigation"
         toggleLabel={{ expandedLabel: 'Minimize', minimizedLabel: 'Expand' }}
@@ -88,6 +89,7 @@ export default function DesktopWrapper({
           />
         ))}
       </SideNavBar>
+      </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 360, padding: 32 }}>

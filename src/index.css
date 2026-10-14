@@ -1,1 +1,9 @@
+body {
+  margin: 0;
+}
 
+/* Keep the side nav exactly the height of the window, including its outer margin. */
+.sidenav-shell > nav {
+  height: calc(100vh - 24px) !important;
+  box-sizing: border-box;
+}
