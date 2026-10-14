@@ -6,6 +6,8 @@ steps in plain language and run commands for them where possible.
 
 ## Start every design from this base
 
+- Left nav: `src/GlobalNav.tsx`, matching the Figma Global Nav (institution "Instructure", user
+  "User Name", collapsible, Canvas label at the bottom). Don't swap in other nav components.
 - Page shell: `src/DesktopWrapper.tsx`. Every full-page design goes inside it. It follows the
   Figma "Wrapper Guide": Global Nav (always), header with page title (always), content area
   (always), optional trailing area, and a user-opened utility panel (one at a time).

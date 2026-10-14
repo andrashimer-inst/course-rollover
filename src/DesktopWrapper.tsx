@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Avatar,
   Breadcrumb,
   Checkbox,
   CheckboxGroup,
@@ -9,22 +8,16 @@ import {
   IconAiLine,
   IconAnnouncementLine,
   IconButton,
-  IconCalendarMonthLine,
-  IconClockLine,
-  IconCoursesLine,
-  IconDashboardLine,
-  IconInboxLine,
-  IconQuestionLine,
   IconXLine,
-  SideNavBar,
   Text,
 } from '@instructure/ui/v11_7'
+import GlobalNav from './GlobalNav'
+import type { NavKey } from './GlobalNav'
 
 // Desktop wrapper built only from InstUI components, following the Figma
 // "Wrapper Guide": GlobalNav, header with page title, content area, optional
 // trailing area, and a user-opened utility panel (one at a time).
 
-type NavKey = 'Dashboard' | 'Courses' | 'Calendar' | 'Inbox' | 'History' | 'Help'
 type PanelKey = 'aiAgent' | 'notifications' | 'filtering'
 
 export type DesktopWrapperProps = {
@@ -38,15 +31,6 @@ export type DesktopWrapperProps = {
   filterContent?: ReactNode
   children: ReactNode
 }
-
-const NAV: { key: NavKey; icon: ReactNode }[] = [
-  { key: 'Dashboard', icon: <IconDashboardLine /> },
-  { key: 'Courses', icon: <IconCoursesLine /> },
-  { key: 'Calendar', icon: <IconCalendarMonthLine /> },
-  { key: 'Inbox', icon: <IconInboxLine /> },
-  { key: 'History', icon: <IconClockLine /> },
-  { key: 'Help', icon: <IconQuestionLine /> },
-]
 
 const PANEL_LABEL: Record<PanelKey, string> = {
   aiAgent: 'AI assistant',
@@ -69,27 +53,7 @@ export default function DesktopWrapper({
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <div className="sidenav-shell" style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
-      <SideNavBar
-        label="Main navigation"
-        toggleLabel={{ expandedLabel: 'Minimize', minimizedLabel: 'Expand' }}
-      >
-        <SideNavBar.Item
-          icon={<Avatar name="Peter Panda" size="x-small" />}
-          label="Peter Panda"
-          href="#"
-        />
-        {NAV.map(({ key, icon }) => (
-          <SideNavBar.Item
-            key={key}
-            icon={icon}
-            label={key}
-            href="#"
-            selected={key === activeNav}
-          />
-        ))}
-      </SideNavBar>
-      </div>
+      <GlobalNav activeNav={activeNav} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 360, padding: 32 }}>
