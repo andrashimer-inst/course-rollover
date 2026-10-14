@@ -29,6 +29,14 @@ steps in plain language and run commands for them where possible.
 - InstUI `View` ignores layout styles such as `flex` and `width`. Use plain `div` boxes for layout.
 - Figma-only "(beta)" components (GlobalNav, Wrapper, ContentTabList, TrailingContentArea,
   UtilityPanel) don't exist in the package. Build them from `SideNavBar`, `Tray`, `Tabs` and so on.
+- **Source of truth.** Design (how it looks, which variants, when to use it) follows the Figma
+  components. Buildability follows the installed package, which is the latest code. The site docs
+  mostly describe the legacy components, so use them for behavior and examples only. Where Figma
+  and code disagree, design from Figma, build with the closest package component, and say what the
+  code can't do. Details and name mappings are in `docs/compare.md`.
+- Always prefer the `v2` (new theme) version of a component. Check `docs/compare.md` before using a
+  component: it lists what is not in the package (for example Card), what is legacy only, and
+  Figma-versus-code prop names.
 - Before picking or configuring a component, check `docs/components.md`. It summarizes each
   Figma component page: variants, when to use it and when not, best practices, accessibility.
   Follow it, and use its "Choosing between similar components" list.
