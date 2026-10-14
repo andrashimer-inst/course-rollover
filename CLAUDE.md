@@ -60,6 +60,11 @@ steps in plain language and run commands for them where possible.
   transparent background so the options sit on the nav. When the sub nav is closed a 32px strip
   with an open button stays. Going to a course marks both "Courses" and the course as current
   (check mark). All of it is in `src/GlobalNav.tsx` and reads theme tokens for Light, Dark and Legacy.
+- **Legacy global nav.** In Legacy the left nav is the Canvas one: a flush, full-height dark bar
+  (80px) with stacked icon-and-label items (Account, Admin, Dashboard, Courses, Calendar, Inbox,
+  History, Portfolio, Help with a badge), the current item as a white tab, and a collapse arrow at
+  the bottom. It is `LegacyNav` in `src/GlobalNav.tsx`. The Canvas logo at the top is a text
+  placeholder. Light and Dark use the floating card nav described above.
 - **Course menu.** A page inside a course passes `course={{ name, items }}` to `DesktopWrapper`
   (items: `label`, `unpublished`, `current`). In Light and Dark that menu (Home, Announcements, ...
   with an eye icon on unpublished items and a check on the current one) is the first level of the

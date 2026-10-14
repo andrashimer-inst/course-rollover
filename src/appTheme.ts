@@ -27,6 +27,10 @@ export function useSurfaceTokens() {
     key,
     pageColor: shared.background.pageColor as string, // page background (light grey in Light)
     containerColor: shared.background.containerColor as string, // cards, nav, panels
+    inverseColor: shared.background.inverseColor as string, // dark navy bar in Legacy
+    onColor: shared.background.onColor as string, // text and icons on dark surfaces
+    linkColor: semantic.color.text.info as string,
+    fontFamily: semantic.fontFamily.base as string,
     borderColor: shared.stroke.mutedColor as string,
     borderWidth: shared.strokeWidth.sm as string,
     radius: shared.borderRadius.lg as string,
