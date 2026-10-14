@@ -23,6 +23,9 @@ steps in plain language and run commands for them where possible.
 - Keep `@instructure/ui` pinned to `11.7.8`. Version 11.7.9 has a broken package on npm.
 - No hard-coded colors, fonts, or spacing. Use component props and theme tokens so all three
   themes work. Keep Text and Heading components separate.
+- Use `DateInput`, never `DateInput2`: `DateInput2` has no dark-theme support (its labels turn
+  unreadable in Dark). The 11.7 `DateInput` has the same API. Before using any component, check
+  that it is not marked deprecated in `docs/instui-site/<Component>.md`.
 - InstUI `View` ignores layout styles such as `flex` and `width`. Use plain `div` boxes for layout.
 - Figma-only "(beta)" components (GlobalNav, Wrapper, ContentTabList, TrailingContentArea,
   UtilityPanel) don't exist in the package. Build them from `SideNavBar`, `Tray`, `Tabs` and so on.
