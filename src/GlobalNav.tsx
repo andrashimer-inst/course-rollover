@@ -4,6 +4,9 @@ import {
   Avatar,
   Badge,
   BaseButton,
+  CondensedButton,
+  IconArrowOpenStartLine,
+  IconOffLine,
   Drilldown,
   Heading,
   IconCheckMarkLine,
@@ -59,9 +62,15 @@ const MY_COURSES = [
   'ENG1: College Writing',
   'HIST101: World History',
 ]
-type SubNav = 'courses' | 'my-courses'
+type SubNav = 'course' | 'courses' | 'my-courses'
+
+export type CourseNavItem = { label: string; unpublished?: boolean; current?: boolean }
+// The navigation of the course the user is in (Home, Announcements, ...). In Light and Dark it
+// lives in the Courses sub navigation. In Legacy the page shows it itself, as in Canvas today.
+export type CourseNav = { name: string; items: CourseNavItem[] }
 
 export type GlobalNavProps = {
+  course?: CourseNav
   activeNav?: NavKey
   institutionName?: string
   userName?: string
@@ -69,6 +78,7 @@ export type GlobalNavProps = {
 }
 
 export default function GlobalNav({
+  course,
   activeNav = 'Dashboard',
   institutionName = 'Instructure',
   userName = 'User Name',
@@ -77,7 +87,7 @@ export default function GlobalNav({
   const [collapsed, setCollapsed] = useState(false)
   // Which sub navigation is open (null = closed) and which course the user went to.
   const [subNav, setSubNav] = useState<SubNav | null>(null)
-  const [lastSubNav, setLastSubNav] = useState<SubNav>('courses')
+  const [lastSubNav, setLastSubNav] = useState<SubNav>(course ? 'course' : 'courses')
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
   const t = useSurfaceTokens()
   const openSub = (level: SubNav | null) => {
@@ -89,6 +99,8 @@ export default function GlobalNav({
   // Figma: in Light and Dark the nav is a rounded card with a 12px margin. In Legacy it is
   // flush with the window edge, full height, with no rounding.
   const legacy = t.key === 'legacy'
+  // Figma's multilevel sub navigation is for the new themes. Legacy keeps the Canvas course menu on the page.
+  const subNavEnabled = !legacy
 
   return (
     <div style={{ position: 'sticky', top: 0, height: '100vh', padding: legacy ? 0 : 12, boxSizing: 'border-box', flexShrink: 0 }}>
@@ -147,7 +159,8 @@ export default function GlobalNav({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4, flex: 1, overflowY: 'auto' }}>
             {NAV.map(({ key, icon, hasSubMenu, count }) => {
               const current = key === currentNav
-              const active = hasSubMenu && !collapsed && subNav !== null
+              const hasSub = hasSubMenu && subNavEnabled
+              const active = hasSub && !collapsed && subNav !== null
               const selected = current || active
               const label = count ? `${key}, ${count} unread` : key
               return (
@@ -173,9 +186,9 @@ export default function GlobalNav({
                       withBackground={selected}
                       renderIcon={icon}
                       aria-current={current ? 'page' : undefined}
-                      aria-expanded={hasSubMenu ? subNav !== null : undefined}
+                      aria-expanded={hasSub ? subNav !== null : undefined}
                       onClick={() => {
-                        if (hasSubMenu) openSub(subNav ? null : 'courses')
+                        if (hasSub) openSub(subNav ? null : course ? 'course' : 'courses')
                         else openSub(null)
                       }}
                     >
@@ -189,7 +202,7 @@ export default function GlobalNav({
                             </>
                           )} />
                         ) : null}
-                        {hasSubMenu ? <IconArrowOpenEndLine /> : null}
+                        {hasSub ? <IconArrowOpenEndLine /> : null}
                       </span>
                     </BaseButton>
                   )}
@@ -231,7 +244,7 @@ export default function GlobalNav({
         </div>
 
         {/* Sub navigation: a 32px strip when closed, a 200px panel when open (Figma) */}
-        {!collapsed && (
+        {!collapsed && subNavEnabled && (
           <div
             style={{
               width: subNav ? 200 : 32,
@@ -271,8 +284,57 @@ export default function GlobalNav({
                     <IconMoveStartLine />
                   </IconButton>
                 </div>
-                <div className="subnav-drilldown">
+                {subNav === 'course' && course ? (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', minHeight: 28 }}>
+                        <CondensedButton
+                          renderIcon={<IconArrowOpenStartLine />}
+                          onClick={() => openSub('courses')}
+                        >
+                          Courses
+                        </CondensedButton>
+                      </div>
+                      <Heading level="h2" variant="titleCardLarge">
+                        {selectedCourse ? selectedCourse.split(':')[0] : course.name}
+                      </Heading>
+                      <View as="div" borderWidth="small 0 0 0" />
+                    </div>
+                    <div className="subnav-drilldown" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                      <Drilldown
+                        key="course"
+                        rootPageId="course"
+                        width="100%"
+                        themeOverride={{ borderColor: 'transparent', borderRadius: '0' }}
+                      >
+                        <Drilldown.Page id="course">
+                          {course.items.map((item) => (
+                            <Drilldown.Option
+                              key={item.label}
+                              id={item.label}
+                              renderAfterLabel={
+                                <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  {item.unpublished && (
+                                    <>
+                                      <IconOffLine />
+                                      <ScreenReaderContent>Unpublished</ScreenReaderContent>
+                                    </>
+                                  )}
+                                  {item.current && <IconCheckMarkLine />}
+                                </span>
+                              }
+                            >
+                              {item.label}
+                            </Drilldown.Option>
+                          ))}
+                        </Drilldown.Page>
+                      </Drilldown>
+                    </div>
+                  </>
+                ) : (
+                <div className="subnav-drilldown" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <Drilldown
+                  key="courses"
                   rootPageId="courses"
                   width="100%"
                   // Figma draws the options directly on the nav, with no box around them.
@@ -299,19 +361,23 @@ export default function GlobalNav({
                     renderTitle={<Heading level="h2" variant="titleCardLarge">My courses</Heading>}
                     renderBackButtonLabel="Courses"
                   >
-                    {MY_COURSES.map((course) => (
+                    {MY_COURSES.map((name) => (
                       <Drilldown.Option
-                        key={course}
-                        id={course}
-                        onOptionClick={() => setSelectedCourse(course)}
-                        renderAfterLabel={selectedCourse === course ? <IconCheckMarkLine /> : undefined}
+                        key={name}
+                        id={name}
+                        onOptionClick={() => {
+                          setSelectedCourse(name)
+                          if (course) openSub('course')
+                        }}
+                        renderAfterLabel={selectedCourse === name ? <IconCheckMarkLine /> : undefined}
                       >
-                        {course}
+                        {name}
                       </Drilldown.Option>
                     ))}
                   </Drilldown.Page>
                 </Drilldown>
                 </div>
+                )}
               </>
             )}
           </div>

@@ -60,6 +60,13 @@ steps in plain language and run commands for them where possible.
   transparent background so the options sit on the nav. When the sub nav is closed a 32px strip
   with an open button stays. Going to a course marks both "Courses" and the course as current
   (check mark). All of it is in `src/GlobalNav.tsx` and reads theme tokens for Light, Dark and Legacy.
+- **Course menu.** A page inside a course passes `course={{ name, items }}` to `DesktopWrapper`
+  (items: `label`, `unpublished`, `current`). In Light and Dark that menu (Home, Announcements, ...
+  with an eye icon on unpublished items and a check on the current one) is the first level of the
+  Courses sub navigation, with a "‹ Courses" back button to the course list, and the page must NOT
+  draw its own course menu. In Legacy there is no sub navigation at all (no strip, no panel, no
+  chevron on Courses) and the page draws the course menu itself on the left, as Canvas does today.
+  See `src/CourseRollover.tsx` for both.
 - **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
   in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
   Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.
