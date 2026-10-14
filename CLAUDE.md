@@ -53,6 +53,13 @@ steps in plain language and run commands for them where possible.
 - **Tables.** Tables sit directly on the page background with no fill: give `Table` and its parts
   (`Table.Head`, `Table.Body`, `Table.Row`, `Table.ColHeader`, `Table.Cell`) a transparent
   background with `themeOverride={{ background: 'transparent' }}` (see `src/CourseRollover.tsx`).
+- **Global nav sub navigation (Figma "Multilevel Navigation Flow").** Clicking a main item with a
+  chevron (Courses) opens a 200px panel inside the nav card: a 24px bold title, a separator, then
+  the options, and a button at the top right to close it. An option with a chevron opens the next
+  level in place (back button "‹ Courses" plus the new title). It is InstUI's `Drilldown`, with a
+  transparent background so the options sit on the nav. When the sub nav is closed a 32px strip
+  with an open button stays. Going to a course marks both "Courses" and the course as current
+  (check mark). All of it is in `src/GlobalNav.tsx` and reads theme tokens for Light, Dark and Legacy.
 - **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
   in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
   Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.

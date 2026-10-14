@@ -1,3 +1,9 @@
 body {
   margin: 0;
 }
+
+/* The sub navigation options sit directly on the nav card (Figma), not in a box of their own. */
+.subnav-drilldown ul,
+.subnav-drilldown li {
+  background: transparent !important;
+}

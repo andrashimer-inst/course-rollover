@@ -4,6 +4,9 @@ import {
   Avatar,
   Badge,
   BaseButton,
+  Drilldown,
+  Heading,
+  IconCheckMarkLine,
   IconArrowOpenEndLine,
   IconButton,
   IconCalendarMonthLine,
@@ -47,6 +50,17 @@ const NAV: NavItem[] = [
 
 const row = { display: 'flex', alignItems: 'center', gap: 8 } as const
 
+// Courses sub navigation (Figma "Multilevel Navigation Flow"): level 1 lists Overview, My courses
+// (opens level 2) and Course catalog. Sample data only.
+const COURSES_SUB = ['Overview', 'My courses', 'Course catalog']
+const MY_COURSES = [
+  'CS101: Intro to Computer Science',
+  'CALC2: Advanced Calculus',
+  'ENG1: College Writing',
+  'HIST101: World History',
+]
+type SubNav = 'courses' | 'my-courses'
+
 export type GlobalNavProps = {
   activeNav?: NavKey
   institutionName?: string
@@ -61,7 +75,17 @@ export default function GlobalNav({
   userRole = 'student',
 }: GlobalNavProps) {
   const [collapsed, setCollapsed] = useState(false)
+  // Which sub navigation is open (null = closed) and which course the user went to.
+  const [subNav, setSubNav] = useState<SubNav | null>(null)
+  const [lastSubNav, setLastSubNav] = useState<SubNav>('courses')
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
   const t = useSurfaceTokens()
+  const openSub = (level: SubNav | null) => {
+    setSubNav(level)
+    if (level) setLastSubNav(level)
+  }
+  // Going to a course makes both "Courses" and that course the current location.
+  const currentNav: NavKey = selectedCourse ? 'Courses' : activeNav
   // Figma: in Light and Dark the nav is a rounded card with a 12px margin. In Legacy it is
   // flush with the window edge, full height, with no rounding.
   const legacy = t.key === 'legacy'
@@ -81,6 +105,7 @@ export default function GlobalNav({
           overflow: 'hidden',
         }}
       >
+        <div style={{ display: 'flex', height: '100%' }}>
         <div
           style={{
             display: 'flex',
@@ -89,7 +114,8 @@ export default function GlobalNav({
             height: '100%',
             boxSizing: 'border-box',
             padding: 12,
-            width: collapsed ? 68 : 232,
+            width: collapsed ? 68 : 200,
+            flexShrink: 0,
           }}
         >
           {/* Institution */}
@@ -120,7 +146,9 @@ export default function GlobalNav({
           {/* Primary items */}
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4, flex: 1, overflowY: 'auto' }}>
             {NAV.map(({ key, icon, hasSubMenu, count }) => {
-              const selected = key === activeNav
+              const current = key === currentNav
+              const active = hasSubMenu && !collapsed && subNav !== null
+              const selected = current || active
               const label = count ? `${key}, ${count} unread` : key
               return (
                 <li key={key}>
@@ -131,7 +159,7 @@ export default function GlobalNav({
                         withBackground={selected}
                         withBorder={false}
                         color="secondary"
-                        aria-current={selected ? 'page' : undefined}
+                        aria-current={current ? 'page' : undefined}
                       >
                         {icon}
                       </IconButton>
@@ -144,7 +172,12 @@ export default function GlobalNav({
                       withBorder={false}
                       withBackground={selected}
                       renderIcon={icon}
-                      aria-current={selected ? 'page' : undefined}
+                      aria-current={current ? 'page' : undefined}
+                      aria-expanded={hasSubMenu ? subNav !== null : undefined}
+                      onClick={() => {
+                        if (hasSubMenu) openSub(subNav ? null : 'courses')
+                        else openSub(null)
+                      }}
                     >
                       <span style={{ ...row, justifyContent: 'space-between', width: '100%' }}>
                         <Text weight="normal">{key}</Text>
@@ -183,6 +216,7 @@ export default function GlobalNav({
               withBackground={false}
               withBorder={false}
               color="secondary"
+              isCondensed
               renderIcon={<IconMoveStartLine />}
               onClick={() => setCollapsed(true)}
             >
@@ -194,6 +228,94 @@ export default function GlobalNav({
           <View as="div" borderWidth="small 0 0 0" padding="small 0 0 0" textAlign="center">
             <Text weight="bold" size={collapsed ? 'x-small' : 'medium'}>Canvas</Text>
           </View>
+        </div>
+
+        {/* Sub navigation: a 32px strip when closed, a 200px panel when open (Figma) */}
+        {!collapsed && (
+          <div
+            style={{
+              width: subNav ? 200 : 32,
+              flexShrink: 0,
+              height: '100%',
+              boxSizing: 'border-box',
+              borderLeft: `${t.borderWidth} solid ${t.borderColor}`,
+              padding: subNav ? 12 : '12px 0',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: subNav ? 'stretch' : 'center',
+              gap: 8,
+            }}
+          >
+            {!subNav ? (
+              <Tooltip renderTip="Open sub navigation" placement="end">
+                <IconButton
+                  size="small"
+                  withBackground={false}
+                  withBorder={false}
+                  screenReaderLabel="Open sub navigation"
+                  onClick={() => openSub(lastSubNav)}
+                >
+                  <IconMoveEndLine />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <IconButton
+                    size="small"
+                    withBackground={false}
+                    withBorder={false}
+                    screenReaderLabel="Close sub navigation"
+                    onClick={() => openSub(null)}
+                  >
+                    <IconMoveStartLine />
+                  </IconButton>
+                </div>
+                <div className="subnav-drilldown">
+                <Drilldown
+                  rootPageId="courses"
+                  width="100%"
+                  // Figma draws the options directly on the nav, with no box around them.
+                  themeOverride={{ borderColor: 'transparent', borderRadius: '0' }}
+                >
+                  <Drilldown.Page
+                    id="courses"
+                    renderTitle={<Heading level="h2" variant="titleCardLarge">Courses</Heading>}
+                  >
+                    {COURSES_SUB.map((label) =>
+                      label === 'My courses' ? (
+                        <Drilldown.Option key={label} id={label} subPageId="my-courses">
+                          {label}
+                        </Drilldown.Option>
+                      ) : (
+                        <Drilldown.Option key={label} id={label}>
+                          {label}
+                        </Drilldown.Option>
+                      ),
+                    )}
+                  </Drilldown.Page>
+                  <Drilldown.Page
+                    id="my-courses"
+                    renderTitle={<Heading level="h2" variant="titleCardLarge">My courses</Heading>}
+                    renderBackButtonLabel="Courses"
+                  >
+                    {MY_COURSES.map((course) => (
+                      <Drilldown.Option
+                        key={course}
+                        id={course}
+                        onOptionClick={() => setSelectedCourse(course)}
+                        renderAfterLabel={selectedCourse === course ? <IconCheckMarkLine /> : undefined}
+                      >
+                        {course}
+                      </Drilldown.Option>
+                    ))}
+                  </Drilldown.Page>
+                </Drilldown>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         </div>
       </nav>
     </div>
