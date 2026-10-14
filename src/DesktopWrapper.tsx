@@ -10,6 +10,7 @@ import {
   IconButton,
   IconXLine,
   Text,
+  View,
 } from '@instructure/ui/v11_7'
 import GlobalNav from './GlobalNav'
 import type { NavKey } from './GlobalNav'
@@ -107,19 +108,16 @@ export default function DesktopWrapper({
         </div>
 
         {trailingContent && (
-          <aside
-            aria-label={trailingLabel}
-            style={{ width: 320, flexShrink: 0, padding: 32, borderLeft: '1px solid #d7dade' }}
-          >
-            {trailingContent}
+          <aside aria-label={trailingLabel} style={{ width: 320, flexShrink: 0 }}>
+            <View as="div" borderWidth="0 0 0 small" padding="general.space2xl" height="100%">
+              {trailingContent}
+            </View>
           </aside>
         )}
 
         {panel && (
-          <aside
-            aria-label={PANEL_LABEL[panel]}
-            style={{ width: 340, flexShrink: 0, padding: 24, borderLeft: '1px solid #d7dade' }}
-          >
+          <aside aria-label={PANEL_LABEL[panel]} style={{ width: 340, flexShrink: 0 }}>
+            <View as="div" borderWidth="0 0 0 small" padding="general.spaceXl" height="100%">
             <div
               style={{
                 display: 'flex',
@@ -143,6 +141,7 @@ export default function DesktopWrapper({
               {panel === 'notifications' && <Text>You have no new notifications.</Text>}
               {panel === 'filtering' && (filterContent ?? <Text>No filters on this page.</Text>)}
             </div>
+            </View>
           </aside>
         )}
       </div>
