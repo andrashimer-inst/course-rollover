@@ -82,15 +82,71 @@ export default function DesktopWrapper({
     boxShadow: t.shadowResting,
   }
 
+  // Header row (Figma): a 40px row with the breadcrumb centered on the left and the global action
+  // buttons on the right.
+  const breadcrumbRow = (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: 40,
+          gap: 24,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Breadcrumb label="You are here:">
+            {breadcrumb.map((crumb) => (
+              <Breadcrumb.Link key={crumb} href="#">
+                {crumb}
+              </Breadcrumb.Link>
+            ))}
+            <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
+          </Breadcrumb>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <IconButton
+            screenReaderLabel={PANEL_LABEL.aiAgent}
+            withBackground={false}
+            withBorder={false}
+            onClick={() => toggle('aiAgent')}
+          >
+            <IconAiLine />
+          </IconButton>
+          <IconButton
+            screenReaderLabel={PANEL_LABEL.notifications}
+            withBackground={false}
+            withBorder={false}
+            onClick={() => toggle('notifications')}
+          >
+            <IconAnnouncementLine />
+          </IconButton>
+        </div>
+      </div>
+  )
+  // Legacy with a course: the breadcrumb sits above the secondary navigation, across the page.
+  const legacySecondary = Boolean(course) && t.key === 'legacy'
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: t.pageColor }}>
       <GlobalNav activeNav={activeNav} course={course} />
-      {/* Legacy: the course menu is a secondary navigation column of blue links */}
-      {course && t.key === 'legacy' && <LegacyCourseMenu course={course} />}
-
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {legacySecondary && (
+          <div style={{ padding: '16px 32px 0', boxSizing: 'border-box' }}>{breadcrumbRow}</div>
+        )}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+        {/* Legacy: the course menu is a secondary navigation column of blue links */}
+        {legacySecondary && course && <LegacyCourseMenu course={course} />}
         {/* Container: 32px padding around the main container */}
-        <div style={{ flex: 1, minWidth: 360, padding: 32, boxSizing: 'border-box' }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 360,
+            padding: legacySecondary ? '16px 32px 32px' : 32,
+            boxSizing: 'border-box',
+          }}
+        >
           <div
             style={{
               maxWidth: fullWidth ? 'none' : 1100,
@@ -103,50 +159,15 @@ export default function DesktopWrapper({
             {/* Header area (Figma): a 40px row with the breadcrumb centered on the left and the
                 global action buttons on the right, then 8px, then the page title. */}
             <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  minHeight: 40,
-                  gap: 24,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Breadcrumb label="You are here:">
-                    {breadcrumb.map((crumb) => (
-                      <Breadcrumb.Link key={crumb} href="#">
-                        {crumb}
-                      </Breadcrumb.Link>
-                    ))}
-                    <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
-                  </Breadcrumb>
-                </div>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <IconButton
-                    screenReaderLabel={PANEL_LABEL.aiAgent}
-                    withBackground={false}
-                    withBorder={false}
-                    onClick={() => toggle('aiAgent')}
-                  >
-                    <IconAiLine />
-                  </IconButton>
-                  <IconButton
-                    screenReaderLabel={PANEL_LABEL.notifications}
-                    withBackground={false}
-                    withBorder={false}
-                    onClick={() => toggle('notifications')}
-                  >
-                    <IconAnnouncementLine />
-                  </IconButton>
-                </div>
-              </div>
+              {!legacySecondary && breadcrumbRow}
               <Heading level="h1">{pageTitle}</Heading>
             </header>
 
             {/* Content area */}
             <main>{children}</main>
           </div>
+        </div>
+        </div>
         </div>
 
         {trailingContent && (

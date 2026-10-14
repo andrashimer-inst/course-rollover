@@ -6,7 +6,7 @@ import type { CourseNav } from './GlobalNav'
 // of the global nav instead (see GlobalNav).
 export default function LegacyCourseMenu({ course }: { course: CourseNav }) {
   return (
-    <View as="nav" aria-label="Course navigation" display="block" width="16rem" padding="general.space2xl general.spaceXl">
+    <View as="nav" aria-label="Course navigation" display="block" width="16rem" padding="general.spaceLg general.spaceXl general.space2xl">
       <List isUnstyled itemSpacing="small">
         {course.items.map((item) => (
           <List.Item key={item.label}>

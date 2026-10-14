@@ -72,6 +72,8 @@ steps in plain language and run commands for them where possible.
   navigation, with a "‹ Courses" back button to the course list. In Legacy there is no sub
   navigation (no strip, no panel, no chevron on Courses). The wrapper draws the menu as a secondary
   navigation column of plain blue links with eye icons next to the dark bar (`LegacyCourseMenu`).
+  In that layout the breadcrumb row (with the header buttons) spans the top, above the secondary
+  navigation, and the page title and content start below it, to the right of the menu.
 - **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
   in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
   Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.
