@@ -20,6 +20,7 @@ import {
   Tooltip,
   View,
 } from '@instructure/ui/v11_7'
+import { useSurfaceTokens } from './appTheme'
 
 // Desktop Global Nav, matching the Figma "GlobalNav/desktop (beta)" layout:
 // institution, account, primary items, collapse button, product logo.
@@ -60,18 +61,25 @@ export default function GlobalNav({
   userRole = 'student',
 }: GlobalNavProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const t = useSurfaceTokens()
+  // Figma: in Light and Dark the nav is a rounded card with a 12px margin. In Legacy it is
+  // flush with the window edge, full height, with no rounding.
+  const legacy = t.key === 'legacy'
 
   return (
-    <div style={{ position: 'sticky', top: 0, height: '100vh', padding: 12, boxSizing: 'border-box', flexShrink: 0 }}>
-      <View
-        as="nav"
+    <div style={{ position: 'sticky', top: 0, height: '100vh', padding: legacy ? 0 : 12, boxSizing: 'border-box', flexShrink: 0 }}>
+      <nav
         aria-label="Global navigation"
-        background="primary"
-        borderWidth="small"
-        borderRadius="large"
-        shadow="resting"
-        height="100%"
-        display="block"
+        style={{
+          height: '100%',
+          boxSizing: 'border-box',
+          background: t.containerColor,
+          border: legacy ? 'none' : `${t.borderWidth} solid ${t.borderColor}`,
+          borderRight: `${t.borderWidth} solid ${t.borderColor}`,
+          borderRadius: legacy ? 0 : t.radius,
+          boxShadow: legacy ? 'none' : t.shadowResting,
+          overflow: 'hidden',
+        }}
       >
         <div
           style={{
@@ -187,7 +195,7 @@ export default function GlobalNav({
             <Text weight="bold" size={collapsed ? 'x-small' : 'medium'}>Canvas</Text>
           </View>
         </div>
-      </View>
+      </nav>
     </div>
   )
 }

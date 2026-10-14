@@ -29,7 +29,7 @@ only `v2` works in Light and Dark. A component marked "Legacy only" will look wr
 
 | Component | Figma | Code |
 | --- | --- | --- |
-| Alert | `color`; `type` floating or inline | `variant`; `hasShadow` (inline has no shadow). Dismissible needs `renderCloseButtonLabel`. |
+| Alert | `color`; `type` floating or inline | `variant`; `hasShadow` (inline has no shadow). Dismissible needs `renderCloseButtonLabel`. The package Alert draws the old layout with new colors, so in this repo use `src/FigmaAlert.tsx` (`variant`, `type`, `dismissible`) for the Figma look in Light and Dark. |
 | Badge | `type` dot or number; `color` info, success, error, onColor | `type` notification or count; `variant` primary, success, danger, inverse. Cap with `formatOverflowText` (the default text is "N +"). |
 | Pill | 12 colors, 4 sizes | `color` primary, success, info, warning, error only. No size. The extra colors and sizes are design-only. |
 | Checkbox, Checkbox Group, Radio Group | `isDisabled`, `isReadOnly`, `validation` | `disabled`, `readOnly`, and errors through `messages` |

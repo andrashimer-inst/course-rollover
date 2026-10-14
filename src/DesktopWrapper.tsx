@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   Breadcrumb,
   Checkbox,
@@ -10,14 +10,16 @@ import {
   IconButton,
   IconXLine,
   Text,
-  View,
 } from '@instructure/ui/v11_7'
 import GlobalNav from './GlobalNav'
 import type { NavKey } from './GlobalNav'
+import { useSurfaceTokens } from './appTheme'
 
-// Desktop wrapper built only from InstUI components, following the Figma
-// "Wrapper Guide": GlobalNav, header with page title, content area, optional
-// trailing area, and a user-opened utility panel (one at a time).
+// Desktop wrapper built only from InstUI components, following the Figma "Wrapper Guide" and the
+// Wrapper example layouts: GlobalNav, then a container on the theme's page color (light grey in
+// Light) holding the header area and the content area, an optional trailing area, and a
+// utility panel the user opens from the header (one at a time). The panels are floating cards.
+// Colors, radius and shadows come from the active theme's tokens.
 
 type PanelKey = 'aiAgent' | 'notifications' | 'filtering'
 
@@ -25,6 +27,7 @@ export type DesktopWrapperProps = {
   pageTitle: string
   breadcrumb?: string[]
   activeNav?: NavKey
+  // false: content is capped at the Figma max width (1100px). true: fills the space between panels.
   fullWidth?: boolean
   trailingContent?: ReactNode
   trailingLabel?: string
@@ -49,99 +52,125 @@ export default function DesktopWrapper({
   filterContent,
   children,
 }: DesktopWrapperProps) {
+  const t = useSurfaceTokens()
   const [panel, setPanel] = useState<PanelKey | null>(null)
   const toggle = (key: PanelKey) => setPanel((p) => (p === key ? null : key))
 
+  // Figma panels: a card with a 12px margin from the window edge, full height, rounded.
+  const sideSlot = (width: number): CSSProperties => ({
+    width,
+    flexShrink: 0,
+    position: 'sticky',
+    top: 0,
+    height: '100vh',
+    padding: 12,
+    boxSizing: 'border-box',
+  })
+  const card: CSSProperties = {
+    height: '100%',
+    boxSizing: 'border-box',
+    overflowY: 'auto',
+    padding: 12,
+    background: t.containerColor,
+    border: `${t.borderWidth} solid ${t.borderColor}`,
+    borderRadius: t.radius,
+    boxShadow: t.shadowResting,
+  }
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: t.pageColor }}>
       <GlobalNav activeNav={activeNav} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-        <div style={{ flex: 1, minWidth: 360, padding: 32 }}>
-          <header>
-            <Breadcrumb label="You are here:">
-              {breadcrumb.map((crumb) => (
-                <Breadcrumb.Link key={crumb} href="#">
-                  {crumb}
-                </Breadcrumb.Link>
-              ))}
-              <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
-            </Breadcrumb>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 24,
-              }}
-            >
-              <Heading level="h1">{pageTitle}</Heading>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <IconButton
-                  screenReaderLabel={PANEL_LABEL.aiAgent}
-                  withBackground={false}
-                  withBorder={false}
-                  onClick={() => toggle('aiAgent')}
-                >
-                  <IconAiLine />
-                </IconButton>
-                <IconButton
-                  screenReaderLabel={PANEL_LABEL.notifications}
-                  withBackground={false}
-                  withBorder={false}
-                  onClick={() => toggle('notifications')}
-                >
-                  <IconAnnouncementLine />
-                </IconButton>
-              </div>
-            </div>
-          </header>
-
-          <main
+        {/* Container: 32px padding around the main container */}
+        <div style={{ flex: 1, minWidth: 360, padding: 32, boxSizing: 'border-box' }}>
+          <div
             style={{
-              marginTop: 24,
-              maxWidth: fullWidth ? 'none' : 960,
+              maxWidth: fullWidth ? 'none' : 1100,
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 32,
             }}
           >
-            {children}
-          </main>
+            {/* Header area: breadcrumb, page title, global actions */}
+            <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Breadcrumb label="You are here:">
+                {breadcrumb.map((crumb) => (
+                  <Breadcrumb.Link key={crumb} href="#">
+                    {crumb}
+                  </Breadcrumb.Link>
+                ))}
+                <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
+              </Breadcrumb>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 24,
+                }}
+              >
+                <Heading level="h1">{pageTitle}</Heading>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <IconButton
+                    screenReaderLabel={PANEL_LABEL.aiAgent}
+                    withBackground={false}
+                    withBorder={false}
+                    onClick={() => toggle('aiAgent')}
+                  >
+                    <IconAiLine />
+                  </IconButton>
+                  <IconButton
+                    screenReaderLabel={PANEL_LABEL.notifications}
+                    withBackground={false}
+                    withBorder={false}
+                    onClick={() => toggle('notifications')}
+                  >
+                    <IconAnnouncementLine />
+                  </IconButton>
+                </div>
+              </div>
+            </header>
+
+            {/* Content area */}
+            <main>{children}</main>
+          </div>
         </div>
 
         {trailingContent && (
-          <aside aria-label={trailingLabel} style={{ width: 320, flexShrink: 0 }}>
-            <View as="div" borderWidth="0 0 0 small" padding="general.space2xl" height="100%">
-              {trailingContent}
-            </View>
+          <aside aria-label={trailingLabel} style={sideSlot(324)}>
+            <div style={card}>{trailingContent}</div>
           </aside>
         )}
 
         {panel && (
-          <aside aria-label={PANEL_LABEL[panel]} style={{ width: 340, flexShrink: 0 }}>
-            <View as="div" borderWidth="0 0 0 small" padding="general.spaceXl" height="100%">
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Heading level="h2">{PANEL_LABEL[panel]}</Heading>
-              <IconButton
-                screenReaderLabel="Close panel"
-                size="small"
-                withBackground={false}
-                withBorder={false}
-                onClick={() => setPanel(null)}
+          <aside aria-label={PANEL_LABEL[panel]} style={sideSlot(344)}>
+            <div style={card}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
               >
-                <IconXLine />
-              </IconButton>
+                <Heading level="h2">{PANEL_LABEL[panel]}</Heading>
+                <IconButton
+                  screenReaderLabel="Close panel"
+                  size="small"
+                  withBackground={false}
+                  withBorder={false}
+                  onClick={() => setPanel(null)}
+                >
+                  <IconXLine />
+                </IconButton>
+              </div>
+              <div style={{ marginTop: 16 }}>
+                {panel === 'aiAgent' && <Text>Ask a question about this page.</Text>}
+                {panel === 'notifications' && <Text>You have no new notifications.</Text>}
+                {panel === 'filtering' && (filterContent ?? <Text>No filters on this page.</Text>)}
+              </div>
             </div>
-            <div style={{ marginTop: 16 }}>
-              {panel === 'aiAgent' && <Text>Ask a question about this page.</Text>}
-              {panel === 'notifications' && <Text>You have no new notifications.</Text>}
-              {panel === 'filtering' && (filterContent ?? <Text>No filters on this page.</Text>)}
-            </div>
-            </View>
           </aside>
         )}
       </div>

@@ -40,6 +40,16 @@ steps in plain language and run commands for them where possible.
 - Before picking or configuring a component, check `docs/components.md`. It summarizes each
   Figma component page: variants, when to use it and when not, best practices, accessibility.
   Follow it, and use its "Choosing between similar components" list.
+- **Page look (from the Figma wrapper frames).** The wrapper sets the page background from the theme
+  (light grey in Light, near black in Dark, white in Legacy). The global nav and the side panels are
+  floating cards on that background in Light and Dark, and a flush full-height nav in Legacy. All of
+  this comes from theme tokens through `useSurfaceTokens()` in `src/appTheme.ts`. In custom
+  components, use those tokens, never hard-coded colors.
+- **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
+  in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
+  Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.
+- A design branch must keep the theme context: `App.tsx` wraps the page in
+  `AppThemeContext.Provider value={themeKey}` next to `InstUISettingsProvider`.
 - Spacing between components: follow `docs/spacing.md` (tokens such as `gap.sections`,
   `gap.buttons`, `gap.cards.md`, `padding.card.lg`). Don't invent spacing values.
 - For props, examples and details of any component or guide, read the matching file in
