@@ -24,12 +24,16 @@ steps in plain language and run commands for them where possible.
 - InstUI `View` ignores layout styles such as `flex` and `width`. Use plain `div` boxes for layout.
 - Figma-only "(beta)" components (GlobalNav, Wrapper, ContentTabList, TrailingContentArea,
   UtilityPanel) don't exist in the package. Build them from `SideNavBar`, `Tray`, `Tabs` and so on.
-- Show the Badge on header buttons and the Alert on pages only when the Figma guidance fits.
-  Figma component pages: Alert, Badge, Avatar and AI components are read.
+- Before picking or configuring a component, check `docs/components.md`. It summarizes each
+  Figma component page: variants, when to use it and when not, best practices, accessibility.
+  Follow it, and use its "Choosing between similar components" list.
+- Mock content is realistic and synthetic, never lorem ipsum.
 
 ## Figma
 
-- File: InstUI Component Library, key `5WFqF3HVlNdfcJooCaiFoh`.
+- File: InstUI Component Library, key `5WFqF3HVlNdfcJooCaiFoh`. All shared page links are in
+  `docs/figma-links.md`. When the owner says the library changed, re-read those pages and update
+  `docs/components.md`.
 - Read-only. Never edit the file, and never set up Code Connect (it would change the shared library).
 - The connector can't list pages and fails on pages that are too large. Ask for a link to one
   component page or one frame at a time (right-click, Copy link to selection).
