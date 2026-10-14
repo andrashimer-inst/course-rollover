@@ -1,4 +1,4 @@
-# instui-designs
+# instui-template
 
 Screens built with the InstUI component library, previewed on localhost.
 Start from `src/DesktopWrapper.tsx` and the theme switcher in `src/App.tsx`.

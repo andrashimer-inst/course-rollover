@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "instui-designs",
+      "name": "instui-template",
       "runtimeExecutable": "/Users/andras.himer/.local/bin/npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
