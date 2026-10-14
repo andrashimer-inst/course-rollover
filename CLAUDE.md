@@ -29,6 +29,11 @@ steps in plain language and run commands for them where possible.
 - Before picking or configuring a component, check `docs/components.md`. It summarizes each
   Figma component page: variants, when to use it and when not, best practices, accessibility.
   Follow it, and use its "Choosing between similar components" list.
+- Spacing between components: follow `docs/spacing.md` (tokens such as `gap.sections`,
+  `gap.buttons`, `gap.cards.md`, `padding.card.lg`). Don't invent spacing values.
+- For props, examples and details of any component or guide, read the matching file in
+  `docs/instui-site/` (a local copy of https://instructure.design/; `index.md` lists everything).
+  That site covers InstUI 11.7.9; this repo is on 11.7.8.
 - Mock content is realistic and synthetic, never lorem ipsum.
 
 ## Figma
@@ -54,3 +59,13 @@ steps in plain language and run commands for them where possible.
 - Preview: `npm run dev`, then open http://localhost:5173
 - Check a build: `npm run build`
 - Commit and push only when the owner asks. Git author is set for this repo only.
+
+## Branches: template and designs
+
+- `main` is the clean template. Never put a design on `main`.
+- Each design lives on its own branch cut from `main`, named for the design (for example
+  `course-rollover`). A design adds its own page file (for example `src/CourseRollover.tsx`) and
+  points `src/App.tsx` at it. Keep `DesktopWrapper`, `GlobalNav` and the theme switcher as they are.
+- Start a new design: `git checkout main && git pull && git checkout -b <design-name>`.
+- Improvements to the template itself (wrapper, nav, switcher, docs) go on `main`, then get merged
+  into the design branches that need them.
