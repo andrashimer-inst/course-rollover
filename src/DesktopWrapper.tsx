@@ -93,26 +93,29 @@ export default function DesktopWrapper({
               gap: 32,
             }}
           >
-            {/* Header area: breadcrumb, page title, global actions */}
+            {/* Header area (Figma): a 40px row with the breadcrumb centered on the left and the
+                global action buttons on the right, then 8px, then the page title. */}
             <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Breadcrumb label="You are here:">
-                {breadcrumb.map((crumb) => (
-                  <Breadcrumb.Link key={crumb} href="#">
-                    {crumb}
-                  </Breadcrumb.Link>
-                ))}
-                <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
-              </Breadcrumb>
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
+                  minHeight: 40,
                   gap: 24,
                 }}
               >
-                <Heading level="h1">{pageTitle}</Heading>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Breadcrumb label="You are here:">
+                    {breadcrumb.map((crumb) => (
+                      <Breadcrumb.Link key={crumb} href="#">
+                        {crumb}
+                      </Breadcrumb.Link>
+                    ))}
+                    <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
+                  </Breadcrumb>
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
                   <IconButton
                     screenReaderLabel={PANEL_LABEL.aiAgent}
                     withBackground={false}
@@ -131,6 +134,7 @@ export default function DesktopWrapper({
                   </IconButton>
                 </div>
               </div>
+              <Heading level="h1">{pageTitle}</Heading>
             </header>
 
             {/* Content area */}

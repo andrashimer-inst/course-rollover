@@ -45,6 +45,14 @@ steps in plain language and run commands for them where possible.
   floating cards on that background in Light and Dark, and a flush full-height nav in Legacy. All of
   this comes from theme tokens through `useSurfaceTokens()` in `src/appTheme.ts`. In custom
   components, use those tokens, never hard-coded colors.
+- **Header spacing (from Figma).** The header is a 40px-tall row with the breadcrumb centered on the
+  left and the action buttons on the right, then 8px, then the page title. A tight title usually
+  means a row is only as tall as its text. Check spacing against the Figma layer sizes (row heights,
+  button sizes), not just the gap value. After building, measure the rendered gaps in the browser and
+  compare them with the Figma numbers.
+- **Tables.** Tables sit directly on the page background with no fill: give `Table` and its parts
+  (`Table.Head`, `Table.Body`, `Table.Row`, `Table.ColHeader`, `Table.Cell`) a transparent
+  background with `themeOverride={{ background: 'transparent' }}` (see `src/CourseRollover.tsx`).
 - **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
   in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
   Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.
