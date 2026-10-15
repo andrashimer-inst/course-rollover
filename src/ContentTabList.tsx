@@ -45,12 +45,11 @@ export default function ContentTabList({ title, items, current, onSelect }: Cont
     borderRadius: t.radiusCardSm,
     boxShadow: t.shadowResting,
     flexShrink: 0,
-    alignSelf: 'flex-start',
   } as const
 
   if (!open) {
     return (
-      <div style={card}>
+      <div style={{ ...card, alignSelf: 'flex-start' }}>
         <IconButton
           screenReaderLabel="Show page navigation"
           withBackground={false}
@@ -68,7 +67,7 @@ export default function ContentTabList({ title, items, current, onSelect }: Cont
   }
 
   return (
-    <nav aria-label="Page navigation" style={{ ...card, width: '18.75rem' }}>
+    <nav aria-label="Page navigation" style={{ ...card, width: '18.75rem', alignSelf: 'stretch' }}>
       <div style={{ padding: t.paddingCardSm, display: 'flex', flexDirection: 'column', gap: t.space.md }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Heading level="h2" variant="titleCardRegular">

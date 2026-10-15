@@ -98,10 +98,12 @@ export default function ModernWrapper({
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         {/* Container: 32px padding around the main container */}
-        <div style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', padding: t.space.xxl, overflowX: 'clip' }}>
+        <div style={{ ...column, flex: 1, minWidth: 0, boxSizing: 'border-box', padding: t.space.xxl, overflowX: 'clip' }}>
           <div
             style={{
               ...column,
+              flex: 1,
+              width: '100%',
               gap: t.space.xxl,
               maxWidth: expanded ? 'none' : 1100,
               margin: '0 auto',
@@ -216,14 +218,15 @@ export default function ModernWrapper({
               )}
             </div>
 
-            {/* Content row: ContentTabList | content area | TrailingContentArea */}
-            <div style={{ display: 'flex', alignItems: 'stretch', gap: t.gapCards }}>
+            {/* Content row: ContentTabList | content area | TrailingContentArea. The row fills the
+                page down to the bottom padding, and the two side areas are as tall as the row. */}
+            <div style={{ display: 'flex', flex: 1, alignItems: 'stretch', gap: t.gapCards }}>
               {contentTabList && <ContentTabList {...contentTabList} />}
               <main id="main-content" tabIndex={-1} style={{ flex: 1, minWidth: '22.5rem', outline: 'none' }}>
                 {children}
               </main>
               {trailingContent && (
-                <aside aria-label={trailingLabel} style={{ ...column, width: '18.75rem', flexShrink: 0 }}>
+                <aside aria-label={trailingLabel} style={{ display: 'grid', gridTemplateRows: '1fr', width: '18.75rem', flexShrink: 0 }}>
                   {trailingContent}
                 </aside>
               )}
