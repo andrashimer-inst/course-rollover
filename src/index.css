@@ -39,3 +39,11 @@ body {
 .legacy-tray-mount * {
   pointer-events: auto;
 }
+
+/* Theme switcher: the Legacy, Light and Dark toggle labels render too thin at the default weight. */
+.theme-switcher input[name='theme'] + label {
+  font-weight: 500;
+}
+.theme-switcher input[name='theme']:checked + label {
+  background-color: var(--theme-selected);
+}

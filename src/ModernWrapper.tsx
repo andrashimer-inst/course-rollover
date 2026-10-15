@@ -98,7 +98,9 @@ export default function ModernWrapper({
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         {/* Container: 32px padding around the main container */}
-        <div style={{ ...column, flex: 1, minWidth: 0, boxSizing: 'border-box', padding: t.space.xxl, overflowX: 'clip' }}>
+        {/* The container never gets narrower than its header (640px plus padding). When an open panel needs
+            more room than is left, it floats over the container instead of squeezing or cutting it. */}
+        <div style={{ ...column, flex: 1, minWidth: '44rem', boxSizing: 'border-box', padding: t.space.xxl }}>
           <div
             style={{
               ...column,
@@ -234,7 +236,9 @@ export default function ModernWrapper({
           </div>
         </div>
 
-        {/* Utility panel: 420px column, a card with a 12px margin */}
+        {/* Utility panel: a 420px card column fixed to the right edge, with a 12px margin. The spacer beside
+            the container reserves its width and gives it back when the window is too narrow. */}
+        {panel && <div aria-hidden style={{ width: '26.25rem', flexShrink: 1, minWidth: 0 }} />}
         {panel && (
           <aside
             ref={panelEl}
@@ -242,9 +246,10 @@ export default function ModernWrapper({
             aria-label={PANEL_LABEL[panel]}
             style={{
               width: '26.25rem',
-              flexShrink: 0,
-              position: 'sticky',
+              maxWidth: '100vw',
+              position: 'fixed',
               top: 0,
+              right: 0,
               height: '100vh',
               boxSizing: 'border-box',
               padding: t.space.md,
