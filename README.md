@@ -1,10 +1,16 @@
-# instui-template
+# course-rollover
 
-Screens built with the InstUI component library, previewed on localhost.
-Start from `src/DesktopWrapper.tsx` and the theme switcher in `src/App.tsx`.
-See `CLAUDE.md` for the rules every new design follows.
+The Course Rollover design (Import Content page), built on the InstUI designs template.
+Created from `andrashimer-inst/instui-template`; see `CLAUDE.md` for the rules every change follows.
 
 ```
 npm install
 npm run dev   # http://localhost:5173
+```
+
+Bring in template updates:
+
+```
+git fetch template
+git merge template/main
 ```

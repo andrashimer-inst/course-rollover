@@ -149,12 +149,14 @@ steps in plain language and run commands for them where possible.
 - Check a build: `npm run build`
 - Commit and push only when the owner asks. Git author is set for this repo only.
 
-## Branches: template and designs
+## This repo: the Course Rollover project
 
-- `main` is the clean template. Never put a design on `main`.
-- Each design lives on its own branch cut from `main`, named for the design (for example
-  `course-rollover`). A design adds its own page file (for example `src/CourseRollover.tsx`) and
-  points `src/App.tsx` at it. Keep `DesktopWrapper`, `GlobalNav` and the theme switcher as they are.
-- Start a new design: `git checkout main && git pull && git checkout -b <design-name>`.
-- Improvements to the template itself (wrapper, nav, switcher, docs) go on `main`, then get merged
-  into the design branches that need them.
+- This repo was created from the template `andrashimer-inst/instui-template` and is linked to it
+  through the git remote `template`. `main` here is this project's main branch, and it holds the
+  Course Rollover "Import Content" design (`src/CourseRollover.tsx`, used by `src/App.tsx`).
+- Variations and experiments go on short branches cut from `main` (for example `option-b`).
+- Template fixes (wrapper, nav, alerts, rules, docs) are made in the template repo. To bring them in:
+  `git fetch template && git merge template/main`. Expect a conflict in `src/App.tsx`: keep this
+  project's version.
+- Do not change the shared template files here unless the owner asks. If a template file needs a
+  fix, make it in the template repo and merge it in.
