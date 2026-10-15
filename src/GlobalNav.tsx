@@ -3,14 +3,23 @@ import type { ReactNode } from 'react'
 import {
   Avatar,
   Badge,
-  BaseButton,
+  BookTextInstUIIcon,
+  CalendarDaysInstUIIcon,
+  CanvasLogoInstUIIcon,
+  CheckInstUIIcon,
+  ChevronLeftInstUIIcon,
+  ChevronRightInstUIIcon,
+  CircleQuestionMarkInstUIIcon,
+  ClockInstUIIcon,
   CondensedButton,
-  IconArrowOpenStartLine,
-  IconOffLine,
+  EyeOffInstUIIcon,
+  InboxInstUIIcon,
+  LayoutDashboardInstUIIcon,
+  PanelLeftCloseInstUIIcon,
+  PanelLeftOpenInstUIIcon,
+  PlusInstUIIcon,
   Drilldown,
   Heading,
-  IconCheckMarkLine,
-  IconArrowOpenEndLine,
   IconButton,
   IconCalendarMonthLine,
   IconClockLine,
@@ -22,7 +31,6 @@ import {
   IconInboxLine,
   IconMoveEndLine,
   IconMoveStartLine,
-  IconPlusLine,
   IconQuestionLine,
   ScreenReaderContent,
   Text,
@@ -44,14 +52,15 @@ type NavItem = {
   count?: number
 }
 
+// Light and Dark nav items. The icons are the Figma ones (the new icon set).
 const NAV: NavItem[] = [
-  { key: 'Dashboard', icon: <IconDashboardLine /> },
-  { key: 'Courses', icon: <IconCoursesLine />, hasSubMenu: true },
-  { key: 'Calendar', icon: <IconCalendarMonthLine /> },
-  { key: 'Inbox', icon: <IconInboxLine />, count: 9 },
-  { key: 'History', icon: <IconClockLine /> },
-  { key: 'Help', icon: <IconQuestionLine /> },
-  { key: 'Custom', icon: <IconPlusLine /> },
+  { key: 'Dashboard', icon: <LayoutDashboardInstUIIcon size="lg" /> },
+  { key: 'Courses', icon: <BookTextInstUIIcon size="lg" />, hasSubMenu: true },
+  { key: 'Calendar', icon: <CalendarDaysInstUIIcon size="lg" /> },
+  { key: 'Inbox', icon: <InboxInstUIIcon size="lg" />, count: 9 },
+  { key: 'History', icon: <ClockInstUIIcon size="lg" /> },
+  { key: 'Help', icon: <CircleQuestionMarkInstUIIcon size="lg" /> },
+  { key: 'Custom', icon: <PlusInstUIIcon size="lg" /> },
 ]
 
 const row = { display: 'flex', alignItems: 'center', gap: 8 } as const
@@ -197,6 +206,106 @@ export default function GlobalNav(props: GlobalNavProps) {
   return themeKey === 'legacy' ? <LegacyNav activeNav={props.activeNav ?? 'Dashboard'} /> : <ModernNav {...props} />
 }
 
+type Tokens = ReturnType<typeof useSurfaceTokens>
+
+// One main navigation item (Figma: 44px tall, 36px icon container, 8px side padding, 8px gap). The
+// page you are on is filled ("current"); an item whose sub navigation is open is tinted ("selected").
+function NavButton({
+  t,
+  icon,
+  label,
+  current,
+  selected,
+  iconOnly,
+  count,
+  hasSub,
+  expanded,
+  onClick,
+}: {
+  t: Tokens
+  icon: ReactNode
+  label: string
+  current?: boolean
+  selected?: boolean
+  iconOnly?: boolean
+  count?: number
+  hasSub?: boolean
+  expanded?: boolean
+  onClick?: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const { nav } = t
+  const background = current
+    ? nav.itemCurrentBackground
+    : selected
+      ? nav.itemSelectedBackground
+      : hover
+        ? nav.itemHoverBackground
+        : 'transparent'
+  const unread = count ? <ScreenReaderContent>{`${count} unread`}</ScreenReaderContent> : null
+  return (
+    <button
+      type="button"
+      className="gnav-item"
+      aria-current={current ? 'page' : undefined}
+      aria-expanded={hasSub ? expanded : undefined}
+      aria-label={iconOnly ? (count ? `${label}, ${count} unread` : label) : undefined}
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: iconOnly ? 'center' : 'flex-start',
+        gap: t.space.sm,
+        width: iconOnly ? `calc(${nav.iconWrapperHeight} + 2 * ${nav.itemVerticalPadding} )` : '100%',
+        height: `calc(${nav.iconWrapperHeight} + 2 * ${nav.itemVerticalPadding})`,
+        margin: 0,
+        padding: iconOnly ? 0 : `0 ${t.space.sm}`,
+        border: 0,
+        borderRadius: t.radiusMd,
+        background,
+        color: current ? nav.itemCurrentText : nav.textColor,
+        font: 'inherit',
+        fontFamily: t.fontFamily,
+        fontSize: '1rem',
+        lineHeight: 1.5,
+        textAlign: 'start',
+        cursor: 'pointer',
+      }}
+    >
+      <span
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: nav.iconWrapperHeight }}
+        aria-hidden={iconOnly ? undefined : 'true'}
+      >
+        {iconOnly && count ? (
+          <Badge count={count} placement="top end">
+            {icon}
+          </Badge>
+        ) : (
+          icon
+        )}
+      </span>
+      {!iconOnly && (
+        <>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+          {count ? (
+            <>
+              {/* The number is read through the "unread" text, so hide it here to avoid saying it twice. */}
+              <span aria-hidden="true" style={{ display: 'flex' }}>
+                <Badge standalone count={count} />
+              </span>
+              {unread}
+            </>
+          ) : null}
+          {hasSub ? <ChevronRightInstUIIcon size="md" /> : null}
+        </>
+      )}
+    </button>
+  )
+}
+
 function ModernNav({
   course,
   activeNav = 'Dashboard',
@@ -210,121 +319,158 @@ function ModernNav({
   const [lastSubNav, setLastSubNav] = useState<SubNav>(course ? 'course' : 'courses')
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
   const t = useSurfaceTokens()
+  const { nav } = t
   const openSub = (level: SubNav | null) => {
     setSubNav(level)
     if (level) setLastSubNav(level)
   }
   // Going to a course makes both "Courses" and that course the current location.
   const currentNav: NavKey = selectedCourse ? 'Courses' : activeNav
-  // Figma: in Light and Dark the nav is a rounded card with a 12px margin. In Legacy it is
-  // flush with the window edge, full height, with no rounding.
-  const legacy = t.key === 'legacy'
-  // Figma's multilevel sub navigation is for the new themes. Legacy keeps the Canvas course menu on the page.
-  const subNavEnabled = !legacy
+  // Figma (Dismiss and collapse behavior): the nav card has a 12px margin and 232px width. Collapsed,
+  // the margin is 6px and the main navigation is 60px wide, icons only. The 32px sub navigation strip
+  // stays in both states.
+  const margin = collapsed ? nav.minimizedMargin : nav.margin
+  const padX = collapsed ? t.space.sm : nav.mainNavMargin
 
   return (
-    <div style={{ position: 'sticky', top: 0, height: '100vh', padding: legacy ? 0 : 12, boxSizing: 'border-box', flexShrink: 0 }}>
+    <div style={{ position: 'sticky', top: 0, height: '100vh', padding: margin, boxSizing: 'border-box', flexShrink: 0 }}>
       <nav
         aria-label="Global navigation"
         style={{
           height: '100%',
           boxSizing: 'border-box',
-          background: t.containerColor,
-          border: legacy ? 'none' : `${t.borderWidth} solid ${t.borderColor}`,
-          borderRight: `${t.borderWidth} solid ${t.borderColor}`,
-          borderRadius: legacy ? 0 : t.radius,
-          boxShadow: legacy ? 'none' : t.shadowResting,
+          display: 'flex',
+          background: nav.backgroundColor,
+          color: nav.textColor,
+          // The 1px border is drawn inside the card, so the card is exactly 232px wide as in Figma.
+          boxShadow: `inset 0 0 0 ${t.borderWidth} ${nav.borderColor}, ${t.shadowResting}`,
+          borderRadius: collapsed ? nav.minimizedBorderRadius : t.radius,
           overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', height: '100%' }}>
+        {/* Main navigation: 200px expanded, 60px collapsed */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
+            gap: nav.mainNavGap,
             height: '100%',
             boxSizing: 'border-box',
-            padding: 12,
-            width: collapsed ? 68 : 200,
+            width: collapsed ? '3.75rem' : '12.5rem',
             flexShrink: 0,
+            paddingTop: collapsed ? 0 : nav.mainNavMargin,
           }}
         >
           {/* Institution */}
-          <div style={{ ...row, gap: 12, padding: collapsed ? '4px 0' : 8, justifyContent: collapsed ? 'center' : 'flex-start' }}>
-            <Avatar name={institutionName} shape="rectangle" size="medium" />
-            {!collapsed && <Text weight="bold">{institutionName}</Text>}
-          </div>
-
-          {/* Account */}
           {collapsed ? (
-            <Tooltip renderTip={userName} placement="end">
-              <IconButton screenReaderLabel={`Account, ${userName}`} withBackground={false} withBorder={false}>
-                <Avatar name={userName} size="x-small" />
-              </IconButton>
-            </Tooltip>
+            <div
+              style={{
+                height: '3.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderBottom: `${t.borderWidth} solid ${nav.borderColor}`,
+                boxSizing: 'border-box',
+                flexShrink: 0,
+              }}
+            >
+              <Avatar name={institutionName} shape="rectangle" size="small" />
+            </div>
           ) : (
-            <View as="div" borderWidth="small" borderRadius="medium" padding="x-small small">
-              <div style={row}>
-                <Avatar name={userName} size="x-small" />
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <Text size="small">{userName}</Text>
-                  <Text size="x-small" color="secondary">{userRole}</Text>
-                </div>
-              </div>
-            </View>
+            <div style={{ ...row, gap: t.space.md, padding: t.space.sm, margin: `0 ${padX}`, flexShrink: 0 }}>
+              <Avatar name={institutionName} shape="rectangle" size="small" />
+              <Text variant="contentImportant">{institutionName}</Text>
+            </div>
           )}
 
+          {/* Account */}
+          <div style={{ padding: `0 ${padX}`, flexShrink: 0 }}>
+            {collapsed ? (
+              <Tooltip renderTip={`${userName}, ${userRole}`} placement="end">
+                <button
+                  type="button"
+                  className="gnav-item"
+                  aria-label={`Account, ${userName}`}
+                  style={{
+                    boxSizing: 'border-box',
+                    width: '2.75rem',
+                    height: '2.75rem',
+                    padding: 0,
+                    border: 0,
+                    borderRadius: t.radiusMd,
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Avatar name={userName} size="x-small" />
+                </button>
+              </Tooltip>
+            ) : (
+              <div
+                style={{
+                  ...row,
+                  boxSizing: 'border-box',
+                  height: '3rem',
+                  padding: `0.375rem ${t.space.sm}`,
+                  border: `${t.borderWidth} solid ${nav.borderColor}`,
+                  borderRadius: t.radiusMd,
+                }}
+              >
+                <Avatar name={userName} size="x-small" />
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <Text variant="contentSmall">{userName}</Text>
+                  <Text variant="legend">{userRole}</Text>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Primary items */}
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4, flex: 1, overflowY: 'auto' }}>
+          <ul
+            style={{
+              listStyle: 'none',
+              margin: 0,
+              padding: `0 ${padX}`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: collapsed ? 'center' : 'stretch',
+              gap: nav.navItemsGap,
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+            }}
+          >
             {NAV.map(({ key, icon, hasSubMenu, count }) => {
               const current = key === currentNav
-              const hasSub = hasSubMenu && subNavEnabled
-              const active = hasSub && !collapsed && subNav !== null
-              const selected = current || active
-              const label = count ? `${key}, ${count} unread` : key
+              const hasSub = Boolean(hasSubMenu) && subNavEnabledFor(t)
+              const button = (
+                <NavButton
+                  t={t}
+                  icon={icon}
+                  label={key}
+                  current={current}
+                  selected={hasSub && subNav !== null}
+                  iconOnly={collapsed}
+                  count={count}
+                  hasSub={hasSub}
+                  expanded={subNav !== null}
+                  onClick={() => {
+                    if (hasSub) openSub(subNav ? null : course ? 'course' : 'courses')
+                    else openSub(null)
+                  }}
+                />
+              )
               return (
-                <li key={key}>
+                <li key={key} style={{ width: collapsed ? undefined : '100%' }}>
                   {collapsed ? (
                     <Tooltip renderTip={key} placement="end">
-                      <IconButton
-                        screenReaderLabel={label}
-                        withBackground={selected}
-                        withBorder={false}
-                        color="secondary"
-                        aria-current={current ? 'page' : undefined}
-                      >
-                        {icon}
-                      </IconButton>
+                      {button}
                     </Tooltip>
                   ) : (
-                    <BaseButton
-                      display="block"
-                      textAlign="start"
-                      color="secondary"
-                      withBorder={false}
-                      withBackground={selected}
-                      renderIcon={icon}
-                      aria-current={current ? 'page' : undefined}
-                      aria-expanded={hasSub ? subNav !== null : undefined}
-                      onClick={() => {
-                        if (hasSub) openSub(subNav ? null : course ? 'course' : 'courses')
-                        else openSub(null)
-                      }}
-                    >
-                      <span style={{ ...row, justifyContent: 'space-between', width: '100%' }}>
-                        <Text weight="normal">{key}</Text>
-                        {count ? (
-                          <Badge standalone count={count} formatOutput={(n) => (
-                            <>
-                              {n}
-                              <ScreenReaderContent> unread</ScreenReaderContent>
-                            </>
-                          )} />
-                        ) : null}
-                        {hasSub ? <IconArrowOpenEndLine /> : null}
-                      </span>
-                    </BaseButton>
+                    button
                   )}
                 </li>
               )
@@ -332,51 +478,86 @@ function ModernNav({
           </ul>
 
           {/* Collapse */}
-          {collapsed ? (
-            <Tooltip renderTip="Expand sidebar" placement="end">
-              <IconButton
-                screenReaderLabel="Expand sidebar"
-                withBackground={false}
-                withBorder={false}
-                onClick={() => setCollapsed(false)}
+          <div style={{ padding: `0 ${collapsed ? '0.625rem' : padX}`, flexShrink: 0 }}>
+            {collapsed ? (
+              <Tooltip renderTip="Expand sidebar" placement="end">
+                <IconButton
+                  screenReaderLabel="Expand sidebar"
+                  withBackground={false}
+                  withBorder={false}
+                  onClick={() => setCollapsed(false)}
+                >
+                  <PanelLeftOpenInstUIIcon />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <button
+                type="button"
+                className="gnav-item"
+                onClick={() => setCollapsed(true)}
+                style={{
+                  boxSizing: 'border-box',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: t.space.sm,
+                  width: '100%',
+                  height: '2.5rem',
+                  padding: `0 ${t.space.lg}`,
+                  margin: 0,
+                  border: 0,
+                  borderRadius: t.radiusMd,
+                  background: 'transparent',
+                  color: nav.textColor,
+                  fontFamily: t.fontFamily,
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  lineHeight: 1.25,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                }}
               >
-                <IconMoveEndLine />
-              </IconButton>
-            </Tooltip>
-          ) : (
-            <BaseButton
-              display="block"
-              withBackground={false}
-              withBorder={false}
-              color="secondary"
-              isCondensed
-              renderIcon={<IconMoveStartLine />}
-              onClick={() => setCollapsed(true)}
-            >
-              Collapse sidebar
-            </BaseButton>
-          )}
+                <PanelLeftCloseInstUIIcon />
+                Collapse sidebar
+              </button>
+            )}
+          </div>
 
           {/* Product logo */}
-          <View as="div" borderWidth="small 0 0 0" padding="small 0 0 0" textAlign="center">
-            <Text weight="bold" size={collapsed ? 'x-small' : 'medium'}>Canvas</Text>
-          </View>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              height: collapsed ? '3.75rem' : '3.5rem',
+              margin: collapsed ? 0 : `0 ${padX} ${nav.mainNavMargin}`,
+              borderTop: `${t.borderWidth} solid ${nav.borderColor}`,
+              flexShrink: 0,
+            }}
+          >
+            {/* The package has the Canvas mark but not the full wordmark: mark plus text stands in for it. */}
+            <span style={{ display: 'flex', alignItems: 'center', gap: t.space.sm }}>
+              <CanvasLogoInstUIIcon size="lg" inline={false} />
+              {!collapsed && <Text variant="contentImportant">Canvas</Text>}
+            </span>
+          </div>
         </div>
 
         {/* Sub navigation: a 32px strip when closed, a 200px panel when open (Figma) */}
-        {!collapsed && subNavEnabled && (
+        {subNavEnabledFor(t) && (
           <div
             style={{
-              width: subNav ? 200 : 32,
+              width: subNav ? '12.5rem' : '2rem',
               flexShrink: 0,
               height: '100%',
               boxSizing: 'border-box',
-              borderLeft: `${t.borderWidth} solid ${t.borderColor}`,
-              padding: subNav ? 12 : '12px 0',
+              borderLeft: `${t.borderWidth} solid ${nav.borderColor}`,
+              padding: subNav ? t.space.md : `${t.space.md} 0`,
               display: 'flex',
               flexDirection: 'column',
               alignItems: subNav ? 'stretch' : 'center',
-              gap: 8,
+              gap: t.space.sm,
             }}
           >
             {!subNav ? (
@@ -388,7 +569,7 @@ function ModernNav({
                   screenReaderLabel="Open sub navigation"
                   onClick={() => openSub(lastSubNav)}
                 >
-                  <IconMoveEndLine />
+                  <PanelLeftOpenInstUIIcon />
                 </IconButton>
               </Tooltip>
             ) : (
@@ -401,17 +582,14 @@ function ModernNav({
                     screenReaderLabel="Close sub navigation"
                     onClick={() => openSub(null)}
                   >
-                    <IconMoveStartLine />
+                    <PanelLeftCloseInstUIIcon />
                   </IconButton>
                 </div>
                 {subNav === 'course' && course ? (
                   <>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
                       <div style={{ display: 'flex', alignItems: 'center', minHeight: 28 }}>
-                        <CondensedButton
-                          renderIcon={<IconArrowOpenStartLine />}
-                          onClick={() => openSub('courses')}
-                        >
+                        <CondensedButton renderIcon={<ChevronLeftInstUIIcon />} onClick={() => openSub('courses')}>
                           Courses
                         </CondensedButton>
                       </div>
@@ -436,11 +614,11 @@ function ModernNav({
                                 <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                   {item.unpublished && (
                                     <>
-                                      <IconOffLine />
+                                      <EyeOffInstUIIcon />
                                       <ScreenReaderContent>Unpublished</ScreenReaderContent>
                                     </>
                                   )}
-                                  {item.current && <IconCheckMarkLine />}
+                                  {item.current && <CheckInstUIIcon />}
                                 </span>
                               }
                             >
@@ -452,58 +630,62 @@ function ModernNav({
                     </div>
                   </>
                 ) : (
-                <div className="subnav-drilldown" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                <Drilldown
-                  key="courses"
-                  rootPageId="courses"
-                  width="100%"
-                  // Figma draws the options directly on the nav, with no box around them.
-                  themeOverride={{ borderColor: 'transparent', borderRadius: '0' }}
-                >
-                  <Drilldown.Page
-                    id="courses"
-                    renderTitle={<Heading level="h2" variant="titleCardLarge">Courses</Heading>}
-                  >
-                    {COURSES_SUB.map((label) =>
-                      label === 'My courses' ? (
-                        <Drilldown.Option key={label} id={label} subPageId="my-courses">
-                          {label}
-                        </Drilldown.Option>
-                      ) : (
-                        <Drilldown.Option key={label} id={label}>
-                          {label}
-                        </Drilldown.Option>
-                      ),
-                    )}
-                  </Drilldown.Page>
-                  <Drilldown.Page
-                    id="my-courses"
-                    renderTitle={<Heading level="h2" variant="titleCardLarge">My courses</Heading>}
-                    renderBackButtonLabel="Courses"
-                  >
-                    {MY_COURSES.map((name) => (
-                      <Drilldown.Option
-                        key={name}
-                        id={name}
-                        onOptionClick={() => {
-                          setSelectedCourse(name)
-                          if (course) openSub('course')
-                        }}
-                        renderAfterLabel={selectedCourse === name ? <IconCheckMarkLine /> : undefined}
+                  <div className="subnav-drilldown" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                    <Drilldown
+                      key="courses"
+                      rootPageId="courses"
+                      width="100%"
+                      // Figma draws the options directly on the nav, with no box around them.
+                      themeOverride={{ borderColor: 'transparent', borderRadius: '0' }}
+                    >
+                      <Drilldown.Page
+                        id="courses"
+                        renderTitle={<Heading level="h2" variant="titleCardLarge">Courses</Heading>}
                       >
-                        {name}
-                      </Drilldown.Option>
-                    ))}
-                  </Drilldown.Page>
-                </Drilldown>
-                </div>
+                        {COURSES_SUB.map((label) =>
+                          label === 'My courses' ? (
+                            <Drilldown.Option key={label} id={label} subPageId="my-courses">
+                              {label}
+                            </Drilldown.Option>
+                          ) : (
+                            <Drilldown.Option key={label} id={label}>
+                              {label}
+                            </Drilldown.Option>
+                          ),
+                        )}
+                      </Drilldown.Page>
+                      <Drilldown.Page
+                        id="my-courses"
+                        renderTitle={<Heading level="h2" variant="titleCardLarge">My courses</Heading>}
+                        renderBackButtonLabel="Courses"
+                      >
+                        {MY_COURSES.map((name) => (
+                          <Drilldown.Option
+                            key={name}
+                            id={name}
+                            onOptionClick={() => {
+                              setSelectedCourse(name)
+                              if (course) openSub('course')
+                            }}
+                            renderAfterLabel={selectedCourse === name ? <CheckInstUIIcon /> : undefined}
+                          >
+                            {name}
+                          </Drilldown.Option>
+                        ))}
+                      </Drilldown.Page>
+                    </Drilldown>
+                  </div>
                 )}
               </>
             )}
           </div>
         )}
-        </div>
       </nav>
     </div>
   )
+}
+
+// Figma's multilevel sub navigation is for the new themes only.
+function subNavEnabledFor(t: Tokens) {
+  return t.key !== 'legacy'
 }

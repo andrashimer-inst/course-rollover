@@ -14,13 +14,19 @@ import {
 import GlobalNav from './GlobalNav'
 import type { CourseNav, NavKey } from './GlobalNav'
 import LegacyCourseMenu from './LegacyCourseMenu'
-import { useSurfaceTokens } from './appTheme'
+import ModernWrapper from './ModernWrapper'
+import type { ContentTabListConfig } from './ContentTabList'
+import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
 // Desktop wrapper built only from InstUI components, following the Figma "Wrapper Guide" and the
 // Wrapper example layouts: GlobalNav, then a container on the theme's page color (light grey in
 // Light) holding the header area and the content area, an optional trailing area, and a
 // utility panel the user opens from the header (one at a time). The panels are floating cards.
 // Colors, radius and shadows come from the active theme's tokens.
+//
+// Two layouts live behind this one component:
+//   Light and Dark: the Figma "Wrapper (beta)" layout, in `ModernWrapper.tsx`.
+//   Legacy: the original Canvas shell below (`LegacyDesktopWrapper`), unchanged.
 
 type PanelKey = 'aiAgent' | 'notifications' | 'filtering'
 
@@ -38,6 +44,13 @@ export type DesktopWrapperProps = {
   // Pages with filterable content can offer the filtering panel.
   filterContent?: ReactNode
   children: ReactNode
+  // Light and Dark only (the Figma wrapper). Legacy keeps its own shell and ignores these.
+  description?: ReactNode // short page description under the title
+  headerSlot?: ReactNode // custom content in the header, under the title
+  actions?: ReactNode // the page's primary and secondary buttons
+  tabs?: ReactNode // optional page tabs (Tabs)
+  showFilters?: boolean // search, order by and the button that opens the Filters panel
+  contentTabList?: ContentTabListConfig // optional in-page navigation, left of the content
 }
 
 const PANEL_LABEL: Record<PanelKey, string> = {
@@ -46,7 +59,7 @@ const PANEL_LABEL: Record<PanelKey, string> = {
   filtering: 'Filters',
 }
 
-export default function DesktopWrapper({
+function LegacyDesktopWrapper({
   pageTitle,
   breadcrumb = [],
   activeNav = 'Dashboard',
@@ -219,4 +232,9 @@ export function DemoFilters() {
       <Checkbox label="Health and Medicine" value="health" />
     </CheckboxGroup>
   )
+}
+
+export default function DesktopWrapper(props: DesktopWrapperProps) {
+  const themeKey = useAppThemeKey()
+  return themeKey === 'legacy' ? <LegacyDesktopWrapper {...props} /> : <ModernWrapper {...props} />
 }

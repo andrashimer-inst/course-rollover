@@ -10,7 +10,8 @@ steps in plain language and run commands for them where possible.
   "User Name", collapsible, Canvas label at the bottom). Don't swap in other nav components.
 - Page shell: `src/DesktopWrapper.tsx`. Every full-page design goes inside it. It follows the
   Figma "Wrapper Guide": Global Nav (always), header with page title (always), content area
-  (always), optional trailing area, and a user-opened utility panel (one at a time).
+  (always), optional trailing area, and a user-opened utility panel (one at a time). Light and Dark
+  use the Figma wrapper (`src/ModernWrapper.tsx`); Legacy keeps its own shell, see below.
 - Theme switcher (Legacy, Light, Dark) lives in `src/App.tsx`. Keep it on every design so the
   designer can check all three themes.
 - Rules from the guide: one wrapper per page, never nest. `fullWidth` for dashboards and
@@ -40,16 +41,31 @@ steps in plain language and run commands for them where possible.
 - Before picking or configuring a component, check `docs/components.md`. It summarizes each
   Figma component page: variants, when to use it and when not, best practices, accessibility.
   Follow it, and use its "Choosing between similar components" list.
+- **Wrapper layout, Light and Dark (Figma "Wrapper (beta)" page, full notes in `docs/wrapper.md`).**
+  `DesktopWrapper` picks the layout from the theme. Light and Dark: Global Nav, then a container
+  (32px padding, centered, 1100px at most or full width), then a header area and a content row, then
+  an optional utility panel. Pass these props instead of drawing them yourself: `description`,
+  `actions` (primary and secondary buttons), `headerSlot`, `tabs`, `showFilters` (search, order by,
+  filter button that opens the Filters panel), `contentTabList` ({ title, items }), `trailingContent`
+  (a 300px column; the page supplies its own card), `filterContent`, `fullWidth`. The header icon
+  buttons (AI agent, notifications, expand width) and the three panels (AI agent, Notifications,
+  Filters; 420px, one at a time, focus moves in and back) are built in. The content area is at least
+  360px wide, areas are 24px apart. Legacy ignores all of these options and stays exactly as it was:
+  never change `LegacyDesktopWrapper` or `LegacyNav` unless the owner asks.
 - **Page look (from the Figma wrapper frames).** The wrapper sets the page background from the theme
-  (light grey in Light, near black in Dark, white in Legacy). The global nav and the side panels are
-  floating cards on that background in Light and Dark, and a flush full-height nav in Legacy. All of
-  this comes from theme tokens through `useSurfaceTokens()` in `src/appTheme.ts`. In custom
-  components, use those tokens, never hard-coded colors.
-- **Header spacing (from Figma).** The header is a 40px-tall row with the breadcrumb centered on the
-  left and the action buttons on the right, then 8px, then the page title. A tight title usually
-  means a row is only as tall as its text. Check spacing against the Figma layer sizes (row heights,
-  button sizes), not just the gap value. After building, measure the rendered gaps in the browser and
-  compare them with the Figma numbers.
+  (light grey in Light, near black in Dark, white in Legacy). The global nav and the utility panels are
+  floating cards on that background in Light and Dark, and a flush full-height nav in Legacy. The
+  ContentTabList is a card too; the trailing area and the content are not cards unless the page makes
+  them. All of this comes from theme tokens through `useSurfaceTokens()` in `src/appTheme.ts` (it also
+  carries the Figma Global Nav tokens and the spacing tokens). In custom components, use those tokens,
+  never hard-coded colors.
+- **Header spacing (from Figma).** The header is a 40px-tall row with the breadcrumb centered on the left
+  and the three 40px icon buttons on the right, then 8px, then the page title (36px, 45px tall), 4px,
+  the description (20px). Below that the rows (custom slot, actions, tabs, filtering) are 24px apart,
+  and the content row is 32px under the header. A tight title usually means a row is only as tall as
+  its text. Check spacing against the Figma layer sizes (row heights, button sizes), not just the gap
+  value. After building, measure the rendered gaps in the browser and compare them with the Figma
+  numbers (`docs/wrapper.md` lists them).
 - **Tables.** Tables sit directly on the page background with no fill: give `Table` and its parts
   (`Table.Head`, `Table.Body`, `Table.Row`, `Table.ColHeader`, `Table.Cell`) a transparent
   background with `themeOverride={{ background: 'transparent' }}` (see `src/CourseRollover.tsx`).
@@ -58,8 +74,11 @@ steps in plain language and run commands for them where possible.
   the options, and a button at the top right to close it. An option with a chevron opens the next
   level in place (back button "‹ Courses" plus the new title). It is InstUI's `Drilldown`, with a
   transparent background so the options sit on the nav. When the sub nav is closed a 32px strip
-  with an open button stays. Going to a course marks both "Courses" and the course as current
-  (check mark). All of it is in `src/GlobalNav.tsx` and reads theme tokens for Light, Dark and Legacy.
+  with an open button stays (also when the nav is collapsed). Going to a course marks both "Courses"
+  and the course as current (check mark). All of it is in `src/GlobalNav.tsx` and reads theme tokens.
+  The nav collapses to 104px (6px margin, icons only, the Inbox badge on the icon, the Canvas mark at
+  the bottom) with the "Collapse sidebar" button. Light and Dark use the new (lucide) icons; the page
+  you are on is filled, an item with its sub navigation open is tinted.
 - **Legacy global nav.** In Legacy the left nav is the Canvas one: a flush, full-height dark bar
   (80px) with stacked icon-and-label items (Account, Admin, Dashboard, Courses, Calendar, Inbox,
   History, Portfolio, Help with a badge), the current item as a white tab, and a collapse arrow at

@@ -94,8 +94,11 @@ Every component page shows four themes. Some pages name them light, dark, legacy
 - Best practices: columns by default, stacked in narrow spaces like a Tray. showGroupLabel when both parts are one decision. Default the date to today, leave time empty. State the timezone when it matters. Block invalid combinations at render time. Disabled applies to both fields.
 - Accessibility: always labeled, phrased as the question. Say which part failed on error.
 
-### Desktop Wrapper (26976:134014, 29855:46428)
-- Built in `src/DesktopWrapper.tsx`. See CLAUDE.md for the rules.
+### Desktop Wrapper (26976:134014, 29855:46428, whole page 22967:72736)
+- Built in `src/DesktopWrapper.tsx` (Legacy) and `src/ModernWrapper.tsx` (Light and Dark). The full summary of the Figma page, with measurements, is in `docs/wrapper.md`. Rules are in CLAUDE.md.
+- Variants: fullWidth (false is a readable column up to 1100px, true fills the space) x utilityPanel (none, aIAgent, notifications, filters). Optional: ContentTabList, TrailingContentArea, page tabs, filtering row.
+- Use when: a full product page that needs the Global Nav, side panels and consistent container padding. Don't use: for a Modal, Tray, Drawer, a region of a page, or mobile (use the Mobile wrapper).
+- Best practices: one wrapper per page, never nested. Keep the real page title. Design content to stay usable when an open utility panel overlaps the trailing area.
 
 ### Drilldown (15052:3131)
 - Variants: placement = 12 positions (topCenter default; topStart or bottomEnd near screen edges). Arrow visibility; first page or sub-page.
@@ -248,4 +251,4 @@ These links were too large for the Figma connector. Send links to smaller frames
 
 - 2633:1827, 2841:2498, 2943:9029, 3313:7297, 6771:3002, 7741:12636, 7921:8240, 23345:195039, 28690:11666
 - Partly read: Avatar (0:1), Spinner (38789:136556, only one theme preview), Tag (no guidelines on the page), Tray (no guidelines on the page)
-- Too large earlier: Color (2508:239), Theming (8110:35817), Wrapper examples (23002:87182)
+- Too large earlier: Color (2508:239), Theming (8110:35817). The Wrapper page (22967:72736, includes the examples 23002:87182) was read section by section on 2026-10-15.

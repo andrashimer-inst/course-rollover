@@ -14,7 +14,7 @@ When the library is updated, re-read these and refresh `docs/components.md`. Rea
 | Layout | Wrapper Guide | [26976-134014](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=26976-134014) |
 | Layout | Wrapper example layouts and theming | [23002-87182](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=23002-87182) |
 | Layout | Wrapper anatomy (Desktop wrapper) | [29855-46428](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=29855-46428) |
-| Layout | Unknown (very large) | [22967-72736](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=22967-72736) |
+| Layout | Wrapper (beta), the whole page. Read in full on 2026-10-15, one section at a time (section ids and notes in `docs/wrapper.md`) | [22967-72736](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=22967-72736) |
 | Components | AI components | [14220-3119](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=14220-3119) |
 | Components | Alert | [13704-5434](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=13704-5434) |
 | Components | Avatar | [0-1](https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?m=dev&node-id=0-1) |

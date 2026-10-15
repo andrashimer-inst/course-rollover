@@ -7,3 +7,24 @@ body {
 .subnav-drilldown li {
   background: transparent !important;
 }
+
+/* Keyboard focus for the Light and Dark global nav buttons. */
+.gnav-item:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+/* Skip link for the Light and Dark wrapper: hidden until it has keyboard focus. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -4rem;
+  z-index: 10000;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--skip-bg);
+  color: var(--skip-fg);
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
