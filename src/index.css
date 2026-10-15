@@ -34,3 +34,8 @@ body {
 .content-tab-list li > div > span {
   background: transparent !important;
 }
+
+/* The Legacy Courses tray mounts in a click-through box (see LegacyNav.tsx). The tray itself takes clicks. */
+.legacy-tray-mount * {
+  pointer-events: auto;
+}

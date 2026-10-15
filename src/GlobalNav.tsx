@@ -21,23 +21,14 @@ import {
   Drilldown,
   Heading,
   IconButton,
-  IconCalendarMonthLine,
-  IconClockLine,
-  IconCoursesLine,
-  IconFolderLine,
-  IconAdminLine,
-  IconUserLine,
-  IconDashboardLine,
-  IconInboxLine,
-  IconMoveEndLine,
-  IconMoveStartLine,
-  IconQuestionLine,
   ScreenReaderContent,
   Text,
   Tooltip,
   View,
 } from '@instructure/ui/v11_7'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
+import LegacyNav from './LegacyNav'
+import type { TrayCourse } from './LegacyNav'
 
 // Desktop Global Nav, matching the Figma "GlobalNav/desktop (beta)" layout:
 // institution, account, primary items, collapse button, product logo.
@@ -82,128 +73,32 @@ export type CourseNavItem = { label: string; unpublished?: boolean; current?: bo
 export type CourseNav = { name: string; items: CourseNavItem[] }
 
 
-// Legacy (Canvas today): a flush, full-height dark bar with stacked icon and label items, the
-// current item shown as a white tab. No sub navigation here: the course menu is drawn by the page.
-const LEGACY_ITEMS: { label: string; icon: ReactNode; key?: NavKey; badge?: number }[] = [
-  { label: 'Account', icon: <IconUserLine /> },
-  { label: 'Admin', icon: <IconAdminLine /> },
-  { label: 'Dashboard', icon: <IconDashboardLine />, key: 'Dashboard' },
-  { label: 'Courses', icon: <IconCoursesLine />, key: 'Courses' },
-  { label: 'Calendar', icon: <IconCalendarMonthLine />, key: 'Calendar' },
-  { label: 'Inbox', icon: <IconInboxLine />, key: 'Inbox' },
-  { label: 'History', icon: <IconClockLine />, key: 'History' },
-  { label: 'Portfolio', icon: <IconFolderLine /> },
-  { label: 'Help', icon: <IconQuestionLine />, key: 'Help', badge: 10 },
-]
-
-function LegacyNav({ activeNav }: { activeNav: NavKey }) {
-  const t = useSurfaceTokens()
-  const [collapsed, setCollapsed] = useState(false)
-  return (
-    <div style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
-      <nav
-        aria-label="Global navigation"
-        style={{
-          height: '100%',
-          width: collapsed ? 56 : 80,
-          boxSizing: 'border-box',
-          background: t.inverseColor,
-          color: t.onColor,
-          fontFamily: t.fontFamily,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div style={{ padding: '16px 0', textAlign: 'center', fontWeight: 700, fontSize: 12 }} aria-hidden="true">
-          Canvas
-        </div>
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' }}>
-          {LEGACY_ITEMS.map(({ label, icon, key, badge }) => {
-            const current = key === activeNav
-            return (
-              <li key={label}>
-                <button
-                  type="button"
-                  aria-current={current ? 'page' : undefined}
-                  aria-label={badge ? `${label}, ${badge} unread` : label}
-                  style={{
-                    all: 'unset',
-                    fontFamily: t.fontFamily,
-                    boxSizing: 'border-box',
-                    width: '100%',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '10px 4px',
-                    background: current ? t.containerColor : 'transparent',
-                    color: current ? t.linkColor : t.onColor,
-                    fontSize: 13,
-                    textAlign: 'center',
-                  }}
-                >
-                  <span style={{ position: 'relative', display: 'flex', fontSize: 24 }}>
-                    {label === 'Account' ? <Avatar name="User Name" size="small" /> : icon}
-                    {badge && (
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          position: 'absolute',
-                          top: -6,
-                          right: -14,
-                          minWidth: 20,
-                          height: 20,
-                          borderRadius: 10,
-                          background: t.containerColor,
-                          color: t.inverseColor,
-                          fontSize: 12,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {badge}
-                      </span>
-                    )}
-                  </span>
-                  {!collapsed && <span aria-hidden="true">{label}</span>}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-        <button
-          type="button"
-          aria-label={collapsed ? 'Expand global navigation' : 'Collapse global navigation'}
-          onClick={() => setCollapsed((c) => !c)}
-          style={{
-            all: 'unset',
-            cursor: 'pointer',
-            padding: '14px 0',
-            display: 'flex',
-            justifyContent: 'center',
-            color: t.onColor,
-          }}
-        >
-          {collapsed ? <IconMoveEndLine /> : <IconMoveStartLine />}
-        </button>
-      </nav>
-    </div>
-  )
-}
-
 export type GlobalNavProps = {
   course?: CourseNav
   activeNav?: NavKey
   institutionName?: string
   userName?: string
   userRole?: string
+  // Legacy only (the Canvas bar, see LegacyNav.tsx). Light and Dark ignore these.
+  courseList?: TrayCourse[]
+  onNavigate?: (label: string) => void
+  onOpenCourse?: (course: TrayCourse) => void
 }
 
+// Legacy gets the Canvas bar (`LegacyNav`). Light and Dark get the floating card nav below.
 export default function GlobalNav(props: GlobalNavProps) {
   const themeKey = useAppThemeKey()
-  return themeKey === 'legacy' ? <LegacyNav activeNav={props.activeNav ?? 'Dashboard'} /> : <ModernNav {...props} />
+  if (themeKey === 'legacy') {
+    return (
+      <LegacyNav
+        activeNav={props.activeNav ?? 'Dashboard'}
+        courseList={props.courseList}
+        onNavigate={props.onNavigate}
+        onOpenCourse={props.onOpenCourse}
+      />
+    )
+  }
+  return <ModernNav {...props} />
 }
 
 type Tokens = ReturnType<typeof useSurfaceTokens>

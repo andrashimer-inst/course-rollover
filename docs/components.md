@@ -95,7 +95,7 @@ Every component page shows four themes. Some pages name them light, dark, legacy
 - Accessibility: always labeled, phrased as the question. Say which part failed on error.
 
 ### Desktop Wrapper (26976:134014, 29855:46428, whole page 22967:72736)
-- Built in `src/DesktopWrapper.tsx` (Legacy) and `src/ModernWrapper.tsx` (Light and Dark). The full summary of the Figma page, with measurements, is in `docs/wrapper.md`. Rules are in CLAUDE.md.
+- Built in `src/LegacyWrapper.tsx` (Legacy, the Canvas shell from screenshots, not Figma) and `src/ModernWrapper.tsx` (Light and Dark), chosen by `src/DesktopWrapper.tsx`. The full summary of the Figma page, with measurements, is in `docs/wrapper.md`. Rules are in CLAUDE.md.
 - Variants: fullWidth (false is a readable column up to 1100px, true fills the space) x utilityPanel (none, aIAgent, notifications, filters). Optional: ContentTabList, TrailingContentArea, page tabs, filtering row.
 - Use when: a full product page that needs the Global Nav, side panels and consistent container padding. Don't use: for a Modal, Tray, Drawer, a region of a page, or mobile (use the Mobile wrapper).
 - Best practices: one wrapper per page, never nested. Keep the real page title. Design content to stay usable when an open utility panel overlaps the trailing area.

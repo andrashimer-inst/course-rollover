@@ -1,34 +1,18 @@
-import { useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
-import {
-  Breadcrumb,
-  Checkbox,
-  CheckboxGroup,
-  Heading,
-  IconAiLine,
-  IconAnnouncementLine,
-  IconButton,
-  IconXLine,
-  Text,
-} from '@instructure/ui/v11_7'
-import GlobalNav from './GlobalNav'
+import type { ReactNode } from 'react'
+import { Checkbox, CheckboxGroup } from '@instructure/ui/v11_7'
 import type { CourseNav, NavKey } from './GlobalNav'
-import LegacyCourseMenu from './LegacyCourseMenu'
+import LegacyWrapper from './LegacyWrapper'
 import ModernWrapper from './ModernWrapper'
 import type { ContentTabListConfig } from './ContentTabList'
-import { useAppThemeKey, useSurfaceTokens } from './appTheme'
+import type { TrayCourse } from './LegacyNav'
+import { useAppThemeKey } from './appTheme'
 
-// Desktop wrapper built only from InstUI components, following the Figma "Wrapper Guide" and the
-// Wrapper example layouts: GlobalNav, then a container on the theme's page color (light grey in
-// Light) holding the header area and the content area, an optional trailing area, and a
-// utility panel the user opens from the header (one at a time). The panels are floating cards.
-// Colors, radius and shadows come from the active theme's tokens.
-//
-// Two layouts live behind this one component:
+// Desktop wrapper built only from InstUI components. Two layouts live behind this one component,
+// chosen by the active theme:
 //   Light and Dark: the Figma "Wrapper (beta)" layout, in `ModernWrapper.tsx`.
-//   Legacy: the original Canvas shell below (`LegacyDesktopWrapper`), unchanged.
-
-type PanelKey = 'aiAgent' | 'notifications' | 'filtering'
+//   Legacy: the Canvas shell as it is today (nav with Courses tray, top bar with course menu toggle,
+//           title row, side column, footer), in `LegacyWrapper.tsx`.
+// Props are shared. Each layout ignores the options that belong to the other one.
 
 export type DesktopWrapperProps = {
   pageTitle: string
@@ -44,183 +28,18 @@ export type DesktopWrapperProps = {
   // Pages with filterable content can offer the filtering panel.
   filterContent?: ReactNode
   children: ReactNode
-  // Light and Dark only (the Figma wrapper). Legacy keeps its own shell and ignores these.
+  // Light and Dark only (the Figma wrapper). Legacy ignores these, except `actions`.
   description?: ReactNode // short page description under the title
   headerSlot?: ReactNode // custom content in the header, under the title
-  actions?: ReactNode // the page's primary and secondary buttons
+  actions?: ReactNode // the page's buttons. Light and Dark: a row under the header. Legacy: end of the title row.
   tabs?: ReactNode // optional page tabs (Tabs)
   showFilters?: boolean // search, order by and the button that opens the Filters panel
   contentTabList?: ContentTabListConfig // optional in-page navigation, left of the content
-}
-
-const PANEL_LABEL: Record<PanelKey, string> = {
-  aiAgent: 'AI assistant',
-  notifications: 'Notifications',
-  filtering: 'Filters',
-}
-
-function LegacyDesktopWrapper({
-  pageTitle,
-  breadcrumb = [],
-  activeNav = 'Dashboard',
-  course,
-  fullWidth = false,
-  trailingContent,
-  trailingLabel = 'Details',
-  filterContent,
-  children,
-}: DesktopWrapperProps) {
-  const t = useSurfaceTokens()
-  const [panel, setPanel] = useState<PanelKey | null>(null)
-  const toggle = (key: PanelKey) => setPanel((p) => (p === key ? null : key))
-
-  // Figma panels: a card with a 12px margin from the window edge, full height, rounded.
-  const sideSlot = (width: number): CSSProperties => ({
-    width,
-    flexShrink: 0,
-    position: 'sticky',
-    top: 0,
-    height: '100vh',
-    padding: 12,
-    boxSizing: 'border-box',
-  })
-  const card: CSSProperties = {
-    height: '100%',
-    boxSizing: 'border-box',
-    overflowY: 'auto',
-    padding: 12,
-    background: t.containerColor,
-    border: `${t.borderWidth} solid ${t.borderColor}`,
-    borderRadius: t.radius,
-    boxShadow: t.shadowResting,
-  }
-
-  // Header row (Figma): a 40px row with the breadcrumb centered on the left and the global action
-  // buttons on the right.
-  const breadcrumbRow = (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: 40,
-          gap: 24,
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Breadcrumb label="You are here:">
-            {breadcrumb.map((crumb) => (
-              <Breadcrumb.Link key={crumb} href="#">
-                {crumb}
-              </Breadcrumb.Link>
-            ))}
-            <Breadcrumb.Link>{pageTitle}</Breadcrumb.Link>
-          </Breadcrumb>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <IconButton
-            screenReaderLabel={PANEL_LABEL.aiAgent}
-            withBackground={false}
-            withBorder={false}
-            onClick={() => toggle('aiAgent')}
-          >
-            <IconAiLine />
-          </IconButton>
-          <IconButton
-            screenReaderLabel={PANEL_LABEL.notifications}
-            withBackground={false}
-            withBorder={false}
-            onClick={() => toggle('notifications')}
-          >
-            <IconAnnouncementLine />
-          </IconButton>
-        </div>
-      </div>
-  )
-  // Legacy with a course: the breadcrumb sits above the secondary navigation, across the page.
-  const legacySecondary = Boolean(course) && t.key === 'legacy'
-
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: t.pageColor }}>
-      <GlobalNav activeNav={activeNav} course={course} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        {legacySecondary && (
-          <div style={{ padding: '16px 32px 0', boxSizing: 'border-box' }}>{breadcrumbRow}</div>
-        )}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-        {/* Legacy: the course menu is a secondary navigation column of blue links */}
-        {legacySecondary && course && <LegacyCourseMenu course={course} />}
-        {/* Container: 32px padding around the main container */}
-        <div
-          style={{
-            flex: 1,
-            minWidth: 360,
-            padding: legacySecondary ? '16px 32px 32px' : 32,
-            boxSizing: 'border-box',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: fullWidth ? 'none' : 1100,
-              margin: '0 auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 32,
-            }}
-          >
-            {/* Header area (Figma): a 40px row with the breadcrumb centered on the left and the
-                global action buttons on the right, then 8px, then the page title. */}
-            <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {!legacySecondary && breadcrumbRow}
-              <Heading level="h1">{pageTitle}</Heading>
-            </header>
-
-            {/* Content area */}
-            <main>{children}</main>
-          </div>
-        </div>
-        </div>
-        </div>
-
-        {trailingContent && (
-          <aside aria-label={trailingLabel} style={sideSlot(324)}>
-            <div style={card}>{trailingContent}</div>
-          </aside>
-        )}
-
-        {panel && (
-          <aside aria-label={PANEL_LABEL[panel]} style={sideSlot(344)}>
-            <div style={card}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Heading level="h2">{PANEL_LABEL[panel]}</Heading>
-                <IconButton
-                  screenReaderLabel="Close panel"
-                  size="small"
-                  withBackground={false}
-                  withBorder={false}
-                  onClick={() => setPanel(null)}
-                >
-                  <IconXLine />
-                </IconButton>
-              </div>
-              <div style={{ marginTop: 16 }}>
-                {panel === 'aiAgent' && <Text>Ask a question about this page.</Text>}
-                {panel === 'notifications' && <Text>You have no new notifications.</Text>}
-                {panel === 'filtering' && (filterContent ?? <Text>No filters on this page.</Text>)}
-              </div>
-            </div>
-          </aside>
-        )}
-      </div>
-    </div>
-  )
+  // Legacy only (the Canvas shell). Light and Dark ignore these.
+  barActions?: ReactNode // buttons at the end of the top bar, next to the breadcrumb
+  courseList?: TrayCourse[] // courses in the Courses tray
+  onNavigate?: (label: string) => void // a global nav item without a tray was chosen
+  onOpenCourse?: (course: TrayCourse) => void // a course was chosen in the Courses tray
 }
 
 export function DemoFilters() {
@@ -236,5 +55,5 @@ export function DemoFilters() {
 
 export default function DesktopWrapper(props: DesktopWrapperProps) {
   const themeKey = useAppThemeKey()
-  return themeKey === 'legacy' ? <LegacyDesktopWrapper {...props} /> : <ModernWrapper {...props} />
+  return themeKey === 'legacy' ? <LegacyWrapper {...props} /> : <ModernWrapper {...props} />
 }

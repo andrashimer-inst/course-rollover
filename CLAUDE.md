@@ -11,7 +11,8 @@ steps in plain language and run commands for them where possible.
 - Page shell: `src/DesktopWrapper.tsx`. Every full-page design goes inside it. It follows the
   Figma "Wrapper Guide": Global Nav (always), header with page title (always), content area
   (always), optional trailing area, and a user-opened utility panel (one at a time). Light and Dark
-  use the Figma wrapper (`src/ModernWrapper.tsx`); Legacy keeps its own shell, see below.
+  use the Figma wrapper (`src/ModernWrapper.tsx`); Legacy is the Canvas shell as it is today
+  (`src/LegacyWrapper.tsx`), see "Legacy" below.
 - Theme switcher (Legacy, Light, Dark) lives in `src/App.tsx`. Keep it on every design so the
   designer can check all three themes.
 - Rules from the guide: one wrapper per page, never nest. `fullWidth` for dashboards and
@@ -50,8 +51,10 @@ steps in plain language and run commands for them where possible.
   (a 300px column; the page supplies its own card), `filterContent`, `fullWidth`. The header icon
   buttons (AI agent, notifications, expand width) and the three panels (AI agent, Notifications,
   Filters; 420px, one at a time, focus moves in and back) are built in. The content area is at least
-  360px wide, areas are 24px apart. Legacy ignores all of these options and stays exactly as it was:
-  never change `LegacyDesktopWrapper` or `LegacyNav` unless the owner asks.
+  360px wide, areas are 24px apart. Legacy ignores these options (except `actions`, `trailingContent`,
+  `fullWidth`, `course`, `activeNav`, `breadcrumb`). Light and Dark and Legacy are separate layouts: when
+  you work on one, never change the other unless the owner asks (Legacy: `LegacyWrapper.tsx`,
+  `LegacyNav.tsx`, `LegacyCourseMenu.tsx`; Light and Dark: `ModernWrapper.tsx`, the rest of `GlobalNav.tsx`).
 - **Page look (from the Figma wrapper frames).** The wrapper sets the page background from the theme
   (light grey in Light, near black in Dark, white in Legacy). The global nav and the utility panels are
   floating cards on that background in Light and Dark, and a flush full-height nav in Legacy. The
@@ -79,20 +82,37 @@ steps in plain language and run commands for them where possible.
   The nav collapses to 104px (6px margin, icons only, the Inbox badge on the icon, the Canvas mark at
   the bottom) with the "Collapse sidebar" button. Light and Dark use the new (lucide) icons; the page
   you are on is filled, an item with its sub navigation open is tinted.
-- **Legacy global nav.** In Legacy the left nav is the Canvas one: a flush, full-height dark bar
-  (80px) with stacked icon-and-label items (Account, Admin, Dashboard, Courses, Calendar, Inbox,
-  History, Portfolio, Help with a badge), the current item as a white tab, and a collapse arrow at
-  the bottom. It is `LegacyNav` in `src/GlobalNav.tsx`. The Canvas logo at the top is a text
-  placeholder. Light and Dark use the floating card nav described above.
-- **Course menu.** A page inside a course passes `course={{ name, items }}` to `DesktopWrapper`
-  (items: `label`, `unpublished`, `current`; `src/sampleCourse.ts` has a sample). The wrapper does
-  the rest, so the page must NOT draw its own course menu. In Light and Dark the menu (with an eye
-  icon on unpublished items and a check on the current one) is the first level of the Courses sub
-  navigation, with a "‹ Courses" back button to the course list. In Legacy there is no sub
-  navigation (no strip, no panel, no chevron on Courses). The wrapper draws the menu as a secondary
-  navigation column of plain blue links with eye icons next to the dark bar (`LegacyCourseMenu`).
-  In that layout the breadcrumb row (with the header buttons) spans the top, above the secondary
-  navigation, and the page title and content start below it, to the right of the menu.
+- **Course menu.** A page inside a course passes `course={{ name, items }}` to `DesktopWrapper` (items:
+  `label`, `unpublished`, `current`; `src/sampleCourse.ts` has a sample). The wrapper draws the menu, so
+  the page must NOT draw its own. Light and Dark: the first level of the Courses sub navigation (eye icon
+  on unpublished items, check on the current one, "‹ Courses" back button). Legacy: a column of links
+  beside the content, see below.
+- **Legacy (Canvas today, three screens: a page, the Courses tray open, a course page).** Built from
+  the screenshots of the real flow, in `src/LegacyNav.tsx`, `src/LegacyCourseMenu.tsx` and
+  `src/LegacyWrapper.tsx`. The page is flat on white: no cards, no AI or notification panels, no filter
+  row (Light and Dark have those).
+  - *Global nav.* InstUI's `SideNavBar`, which in the Legacy theme is the Canvas bar: flush, full height,
+    84px, dark navy, Canvas logo at the top, then Account (avatar), Admin, Dashboard, Courses,
+    Calendar, Inbox, History, Portfolio, Help (badge). The page you are on is a white tab. The bottom
+    toggle minimizes it to 54px (icons only, tooltips). Leave `SideNavBar` uncontrolled (a controlled
+    `minimized` prop leaves the labels showing in this package version).
+  - *Courses tray.* Clicking Courses opens an InstUI `Tray` next to the bar (it covers the page, no
+    mask) and slides out from behind the bar's right edge (its mount box is clipped to the area right of the
+    bar, see `LegacyNav.tsx`). Title with a close button (focused first), a separator, "All courses", a separator, then
+    "Published courses" and "Unpublished courses" with each course as a link plus code and term, and a
+    short help text. While it is open, Courses is the white tab. Escape, click outside, the close button
+    or Courses again close it. Pass `courseList` (`TrayCourse[]`); `src/sampleCourse.ts` has a sample.
+    Choosing a course calls `onOpenCourse(course)`; other nav items call `onNavigate(label)`.
+  - *Top bar* (shown on course pages, or when `breadcrumb` has entries): the hamburger shows or hides the
+    course menu, then the breadcrumb, then `barActions` at the end (for example a "Preview as student"
+    button), with a line under it.
+  - *Course menu* (`course` prop): a column of blue links, an eye icon on unpublished items, the current
+    item in dark bold text with a bar at its start edge.
+  - *Title row:* the page title (`h1`) and the page's `actions` at the end of the row. Pages without a
+    course menu draw a line under the row. Then the content, and the side column (`trailingContent`,
+    plain content, 248px, no card) beside it. A footer with the Instructure mark, the name as text (the
+    package has no wordmark) and policy links closes the page.
+  - `fullWidth` false centers a column of 1100px at most (plus the side column); true fills the page.
 - **Alerts.** Use `src/FigmaAlert.tsx`, not the package `Alert`. The package Alert puts the new colors
   in the old layout. FigmaAlert draws the Figma design (solid floating, tinted inline) in Light and
   Dark and falls back to the package Alert in Legacy, which is already the Figma legacy design.

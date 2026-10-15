@@ -4,8 +4,8 @@ Summarized from the Figma page "→ Wrapper (beta) | Not yet available in code" 
 `https://www.figma.com/design/5WFqF3HVlNdfcJooCaiFoh/InstUI-Component-Library?node-id=22967-72736`.
 
 This describes the **Light and Dark** wrapper. It is built in `src/ModernWrapper.tsx`, `src/GlobalNav.tsx` (`ModernNav`), `src/ContentTabList.tsx` and `src/UtilityPanels.tsx`.
-**Legacy keeps the original Canvas shell** (`LegacyDesktopWrapper` in `src/DesktopWrapper.tsx` and `LegacyNav`) and ignores the Light and Dark options below. The page is too large for one
-connector call: read it one section at a time (the section node ids are listed here).
+**Legacy is the Canvas shell as it is today** (`src/LegacyWrapper.tsx`, `src/LegacyNav.tsx`, `src/LegacyCourseMenu.tsx`, see the Legacy section at the end) and ignores the Light and Dark options below.
+The Figma page is too large for one connector call: read it one section at a time (the section node ids are listed here).
 
 ## Sections of the Figma page
 
@@ -49,7 +49,20 @@ connector call: read it one section at a time (the section node ids are listed h
 
 ## What the code does
 
-- `DesktopWrapper` picks the layout from the theme: Legacy gets the original shell, Light and Dark get `ModernWrapper`.
+- `DesktopWrapper` picks the layout from the theme: Legacy gets `LegacyWrapper`, Light and Dark get `ModernWrapper`.
 - New props (Light and Dark only): `description`, `headerSlot`, `actions`, `tabs`, `showFilters`, `contentTabList` ({ title, items, current, onSelect }), plus the existing `trailingContent`, `trailingLabel`, `filterContent`, `fullWidth`, `course`, `activeNav`, `breadcrumb`.
 - `App.tsx` has a Layout box under the theme switcher to try the filter row, content tab list, trailing area and full width. The box moves left of an open panel.
 - Not built: the Mobile wrapper, notifications or AI content that comes from real data, and the Canvas wordmark (the package only has the mark, so the nav shows the mark and the word "Canvas").
+
+## Legacy (Canvas today)
+
+Not from the Figma page. Built from three screenshots of the real Canvas flow: a dashboard-style page, the Courses tray open, a course page. Sample text is generic on purpose.
+
+- **Global nav** (`LegacyNav`): InstUI `SideNavBar` in the Legacy theme. 84px wide (54px minimized), flush, full height, navy (`SideNavBar` token `backgroundColor`). Canvas logo, Account (avatar), Admin, Dashboard, Courses, Calendar, Inbox, History, Portfolio, Help (badge). The current page is a white tab with blue icon and label. Items are about 64px tall.
+- **Courses tray**: InstUI `Tray`, `placement="start"`, 23rem wide, to the right of the bar, full height, shadow, no mask. Its content: a 22px bold title and a close button, a line, a link "All courses", a line, groups with a 16px bold title and course links (each with code and term below in small grey text), a short help text. It is mounted in a transformed box on the bar's right edge so it opens beside the bar (and follows it when minimized). Closes with Escape, a click outside, the close button or Courses again.
+- **Top bar** (course pages, or when a breadcrumb is passed): padding 16px, a line under it inset 32px from both sides. Hamburger (blue, shows or hides the course menu), the breadcrumb, then `barActions` at the end.
+- **Course menu**: a 13rem column, links about 38px apart, eye icon on unpublished items, current item dark and bold with a 2px bar at its start edge.
+- **Title row**: `h1` (38px bold) with the page's `actions` at the end. Pages without a course menu draw a line under it.
+- **Side column**: 248px, plain content on the page, 48px from the main column. A footer (Instructure mark plus name, policy links) closes the page.
+- **Props that only Legacy reads:** `barActions`, `courseList`, `onNavigate`, `onOpenCourse`. `actions` and `trailingContent` work in both layouts but look different (Legacy: end of the title row and plain side column).
+- **Not in Legacy:** AI agent and notification buttons, the three utility panels, the filter row, the content tab list, the description line.
