@@ -28,3 +28,9 @@ body {
 .skip-link:focus {
   top: 0.5rem;
 }
+
+/* In-page navigation rows sit on the card (Figma). Options draws a fill behind its list; remove it.
+   The selected row keeps its own fill. */
+.content-tab-list li > div > span {
+  background: transparent !important;
+}

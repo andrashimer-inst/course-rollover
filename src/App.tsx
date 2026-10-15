@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   Button,
   Checkbox,
@@ -12,8 +13,27 @@ import {
 import DesktopWrapper from './DesktopWrapper'
 import FigmaAlert from './FigmaAlert'
 import { SAMPLE_COURSE } from './sampleCourse'
-import { AppThemeContext, THEMES } from './appTheme'
+import { AppThemeContext, THEMES, useSurfaceTokens } from './appTheme'
 import type { ThemeKey } from './appTheme'
+
+// A card on the page, as in Figma: the theme's container color (not the View "primary" background,
+// which is a different shade in Dark), 16px radius and padding, elevation 1 shadow.
+function SampleCard({ children }: { children: ReactNode }) {
+  const t = useSurfaceTokens()
+  return (
+    <div
+      style={{
+        boxSizing: 'border-box',
+        background: t.containerColor,
+        borderRadius: t.radiusCardMd,
+        padding: t.space.lg,
+        boxShadow: t.shadowResting,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 // Template page: the wrapper, global nav and theme switcher with a little sample content.
 // A design replaces the sample content (and, on its own branch, this file's page).
@@ -50,12 +70,12 @@ export default function App() {
           }
           trailingContent={
             showTrailing ? (
-              <View as="div" background="primary" padding="padding.card.lg" borderRadius="large" shadow="resting">
+              <SampleCard>
                 <Heading level="h2" variant="titleCardRegular">
                   Course details
                 </Heading>
                 <Text as="p">Supporting information that stays visible next to the main content.</Text>
-              </View>
+              </SampleCard>
             ) : undefined
           }
         >
@@ -66,12 +86,12 @@ export default function App() {
             <FigmaAlert variant="success" type="inline">
               Inline alert: messages that live inside a region of the page.
             </FigmaAlert>
-            <View as="div" padding="padding.card.lg" borderWidth="small" borderRadius="medium">
+            <SampleCard>
               <Heading level="h2">Sample content</Heading>
               <Text as="p">Sample course data only. Replace this with the screen you want to design.</Text>
               {/* Light and Dark show the page actions in the header. Legacy keeps this one in the content. */}
               {!modern && <Button color="primary">Primary action</Button>}
-            </View>
+            </SampleCard>
           </div>
         </DesktopWrapper>
 

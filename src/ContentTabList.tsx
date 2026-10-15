@@ -87,7 +87,7 @@ export default function ContentTabList({ title, items, current, onSelect }: Cont
           </IconButton>
         </div>
         {/* A real list of links. Options only styles the rows, so each row gets its own Options. */}
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul className="content-tab-list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {items.map((item) => {
             const isCurrent = item === selected
             return (
@@ -98,8 +98,8 @@ export default function ContentTabList({ title, items, current, onSelect }: Cont
                     variant={isCurrent ? 'selected' : 'default'}
                     aria-current={isCurrent ? 'location' : undefined}
                     renderAfterLabel={isCurrent ? <CheckInstUIIcon size="lg" /> : undefined}
-                    // Figma rows are 48px tall (a touch target); the default is 44px.
-                    themeOverride={{ paddingVertical: '0.875rem' }}
+                    // Figma rows are 48px tall (a touch target); the default is 44px. Unselected rows have no fill, they sit on the card.
+                    themeOverride={{ paddingVertical: '0.875rem', background: 'transparent' }}
                     onClick={(e: React.MouseEvent) => {
                       e.preventDefault()
                       setSelected(item)
