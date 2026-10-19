@@ -36,7 +36,10 @@ export default function LegacyCourseMenu({ course, id }: { course: CourseNav; id
               href="#"
               variant="standalone"
               aria-current={item.current ? 'page' : undefined}
-              onClick={(e: { preventDefault: () => void }) => e.preventDefault()}
+              onClick={(e: { preventDefault: () => void }) => {
+                e.preventDefault()
+                course.onSelect?.(item.label)
+              }}
               themeOverride={
                 item.current ? { textColor: t.textColor, textHoverColor: t.textColor, fontWeight: 700 } : undefined
               }

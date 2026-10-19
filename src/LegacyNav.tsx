@@ -21,6 +21,7 @@ import {
   Text,
   Tray,
 } from '@instructure/ui/v11_7'
+import { ACCOUNT_LINKS } from './accountLinks'
 import { useSurfaceTokens } from './appTheme'
 import { SAMPLE_COURSE_LIST } from './sampleCourse'
 import type { NavKey } from './GlobalNav'
@@ -36,7 +37,7 @@ export type TrayCourse = { name: string; code: string; term: string; published: 
 type Item = { label: string; key?: NavKey; icon: ReactNode; tray?: boolean }
 
 const ITEMS: Item[] = [
-  { label: 'Account', icon: <Avatar name="User Name" size="small" showBorder="always" /> },
+  { label: 'Account', icon: <Avatar name="User Name" size="small" showBorder="always" />, tray: true },
   { label: 'Admin', icon: <IconAdminLine /> },
   { label: 'Dashboard', key: 'Dashboard', icon: <IconDashboardLine /> },
   { label: 'Courses', key: 'Courses', icon: <IconCoursesLine />, tray: true },
@@ -158,6 +159,24 @@ export default function LegacyNav({
       >
         <CoursesTray courses={courseList} onClose={close} onOpenCourse={onOpenCourse} />
       </Tray>
+      <Tray
+        label="Account"
+        open={tray === 'Account'}
+        onDismiss={close}
+        placement="start"
+        size="small"
+        mountNode={mount}
+        shouldCloseOnDocumentClick
+        themeOverride={{ widthSm: '23rem' }}
+      >
+        <AccountTray
+          onClose={close}
+          onChoose={(label) => {
+            close()
+            onNavigate?.(label)
+          }}
+        />
+      </Tray>
     </div>
   )
 }
@@ -230,6 +249,40 @@ function CoursesTray({
       <Text as="p" variant="content">
         Pick a course to open it. Use All courses to choose which ones show up in this list.
       </Text>
+    </div>
+  )
+}
+
+// The Account tray: the user's name, then the account links. Notebook is here for educators too.
+function AccountTray({ onClose, onChoose }: { onClose: () => void; onChoose: (label: string) => void }) {
+  const t = useSurfaceTokens()
+  const separator = { borderTop: `${t.borderWidth} solid ${t.borderColor}` }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+      <CloseButton placement="end" offset="small" screenReaderLabel="Close account" onClick={onClose} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: t.space.md }}>
+        <Avatar name="User Name" size="medium" />
+        <Heading level="h2" variant="titleCardRegular">
+          User Name
+        </Heading>
+      </div>
+      <div style={separator} />
+      <List isUnstyled itemSpacing="small">
+        {ACCOUNT_LINKS.map((label) => (
+          <List.Item key={label}>
+            <Link
+              href="#"
+              variant="standalone"
+              onClick={(e: { preventDefault: () => void }) => {
+                e.preventDefault()
+                onChoose(label)
+              }}
+            >
+              {label}
+            </Link>
+          </List.Item>
+        ))}
+      </List>
     </div>
   )
 }

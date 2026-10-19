@@ -28,12 +28,11 @@ import {
   OLD_TERM_START,
   addDays,
   checkDate,
-  commentsFor,
   daysBetween,
   fmtDate,
   parseDate,
 } from "./rolloverData";
-import type { CopySummary, Decision, LinkAction } from "./rolloverData";
+import type { CopySummary, Decision, EducatorComment, LinkAction } from "./rolloverData";
 
 // The copy wizard. It opens when someone starts a copy, so the review happens before the copy
 // (discovery priority 1), not after it. Each step has a name that says what it covers:
@@ -230,15 +229,16 @@ function Stepper({
 // ---- Step 1: educator comments -------------------------------------------------------------------------------
 function CommentsStep({
   course,
+  comments,
   decisions,
   onDecide,
 }: {
   course: string;
+  comments: EducatorComment[];
   decisions: Record<string, Decision>;
   onDecide: (id: string, d: Decision) => void;
 }) {
   const t = useSurfaceTokens();
-  const comments = commentsFor(course);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: t.space.lg }}>
       <Text as="p">
@@ -748,11 +748,13 @@ export function SummaryView({ summary }: { summary: CopySummary }) {
 // ---- The wizard ----------------------------------------------------------------------------------------------
 export default function RolloverWizard({
   course,
+  comments,
   adjustDates,
   onCancel,
   onDone,
 }: {
   course: string;
+  comments: EducatorComment[];
   adjustDates: boolean;
   onCancel: () => void;
   onDone: (summary: CopySummary) => void;
@@ -772,7 +774,6 @@ export default function RolloverWizard({
   const [when] = useState(() =>
     new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
   );
-  const comments = useMemo(() => commentsFor(course), [course]);
   const [decisions, setDecisions] = useState<Record<string, Decision>>(() =>
     Object.fromEntries(comments.map((c) => [c.id, c.decision])),
   );
@@ -981,6 +982,7 @@ export default function RolloverWizard({
             {id === "comments" && (
               <CommentsStep
                 course={course}
+                comments={comments}
                 decisions={decisions}
                 onDecide={(cid, d) => setDecisions({ ...decisions, [cid]: d })}
               />

@@ -22,6 +22,8 @@ import RolloverWizard, { ReplaceConfirm, SummaryView } from './RolloverWizard'
 import StatusPill from './StatusPill'
 import { useAppThemeKey } from './appTheme'
 import type { CopySummary } from './rolloverData'
+import { commentsForCopy } from './notebookData'
+import type { Note } from './notebookData'
 
 // Course Rollover: "Import Content" page, built on the template. Figma decides the design, the package
 // decides what exists, new-theme (v2) components only, spacing from docs/spacing.md.
@@ -54,7 +56,15 @@ const FIRST_IMPORTS: ImportRow[] = [{ type: 'Course Copy', source: 'Portfolio Te
 // Tables sit directly on the page background, so every table part gets a transparent fill.
 const noFill = { background: 'transparent' }
 
-export default function CourseRollover() {
+export default function CourseRollover({
+  notes = [],
+  onNavigate,
+}: {
+  // The educator's notebook notes. They show up in the wizard's Review comments step.
+  notes?: Note[]
+  // A global nav item was chosen (for example Notebook in the Account menu or tray).
+  onNavigate?: (label: string) => void
+}) {
   const [contentType, setContentType] = useState(CONTENT_TYPES[0])
   const [course, setCourse] = useState(COURSES[0])
   const [includeCompleted, setIncludeCompleted] = useState(true)
@@ -98,6 +108,7 @@ export default function CourseRollover() {
       // The wrapper draws the course menu: in the Courses sub navigation (Light and Dark) or as a
       // column beside the content (Legacy).
       course={COURSE}
+      onNavigate={onNavigate}
       description={DESCRIPTION}
       fullWidth
     >
@@ -243,6 +254,7 @@ export default function CourseRollover() {
         <RolloverWizard
           key={wizardCourse}
           course={wizardCourse}
+          comments={commentsForCopy(wizardCourse, notes)}
           adjustDates={adjustDates}
           onCancel={() => setWizardCourse(null)}
           onDone={handleDone}

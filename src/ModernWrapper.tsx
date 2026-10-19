@@ -42,6 +42,7 @@ export default function ModernWrapper({
   breadcrumb = [],
   activeNav = 'Dashboard',
   course,
+  onNavigate,
   fullWidth = false,
   description,
   headerSlot,
@@ -94,7 +95,7 @@ export default function ModernWrapper({
       >
         Skip to main content
       </a>
-      <GlobalNav activeNav={activeNav} course={course} />
+      <GlobalNav activeNav={activeNav} course={course} onNavigate={onNavigate} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         {/* Container: 32px padding around the main container */}

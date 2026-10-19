@@ -21,12 +21,14 @@ import {
   Drilldown,
   Heading,
   IconButton,
+  Menu,
   ScreenReaderContent,
   Text,
   Tooltip,
   View,
 } from '@instructure/ui/v11_7'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
+import { ACCOUNT_LINKS } from './accountLinks'
 import LegacyNav from './LegacyNav'
 import type { TrayCourse } from './LegacyNav'
 
@@ -70,7 +72,7 @@ type SubNav = 'course' | 'courses' | 'my-courses'
 export type CourseNavItem = { label: string; unpublished?: boolean; current?: boolean }
 // The navigation of the course the user is in (Home, Announcements, ...). In Light and Dark it
 // lives in the Courses sub navigation. In Legacy the page shows it itself, as in Canvas today.
-export type CourseNav = { name: string; items: CourseNavItem[] }
+export type CourseNav = { name: string; items: CourseNavItem[]; onSelect?: (label: string) => void }
 
 
 export type GlobalNavProps = {
@@ -206,7 +208,8 @@ function ModernNav({
   activeNav = 'Dashboard',
   institutionName = 'Instructure',
   userName = 'User Name',
-  userRole = 'student',
+  userRole = 'educator',
+  onNavigate,
 }: GlobalNavProps) {
   const [collapsed, setCollapsed] = useState(false)
   // Which sub navigation is open (null = closed) and which course the user went to.
@@ -280,47 +283,68 @@ function ModernNav({
 
           {/* Account */}
           <div style={{ padding: `0 ${padX}`, flexShrink: 0 }}>
-            {collapsed ? (
-              <Tooltip renderTip={`${userName}, ${userRole}`} placement="end">
-                <button
-                  type="button"
-                  className="gnav-item"
-                  aria-label={`Account, ${userName}`}
-                  style={{
-                    boxSizing: 'border-box',
-                    width: '2.75rem',
-                    height: '2.75rem',
-                    padding: 0,
-                    border: 0,
-                    borderRadius: t.radiusMd,
-                    background: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Avatar name={userName} size="x-small" />
-                </button>
-              </Tooltip>
-            ) : (
-              <div
-                style={{
-                  ...row,
-                  boxSizing: 'border-box',
-                  height: '3rem',
-                  padding: `0.375rem ${t.space.sm}`,
-                  border: `${t.borderWidth} solid ${nav.borderColor}`,
-                  borderRadius: t.radiusMd,
-                }}
-              >
-                <Avatar name={userName} size="x-small" />
-                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <Text variant="contentSmall">{userName}</Text>
-                  <Text variant="legend">{userRole}</Text>
-                </div>
-              </div>
-            )}
+            <Menu
+              placement="end top"
+              label="Account"
+              trigger={
+                collapsed ? (
+                  <Tooltip renderTip={`${userName}, ${userRole}`} placement="end">
+                    <button
+                      type="button"
+                      className="gnav-item"
+                      aria-label={`Account, ${userName}`}
+                      style={{
+                        boxSizing: 'border-box',
+                        width: '2.75rem',
+                        height: '2.75rem',
+                        padding: 0,
+                        border: 0,
+                        borderRadius: t.radiusMd,
+                        background: 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Avatar name={userName} size="x-small" />
+                    </button>
+                  </Tooltip>
+                ) : (
+                  <button
+                    type="button"
+                    className="gnav-item"
+                    aria-label={`Account, ${userName}`}
+                    style={{
+                      ...row,
+                      boxSizing: 'border-box',
+                      width: '100%',
+                      height: '3rem',
+                      padding: `0.375rem ${t.space.sm}`,
+                      border: `${t.borderWidth} solid ${nav.borderColor}`,
+                      borderRadius: t.radiusMd,
+                      background: 'transparent',
+                      color: nav.textColor,
+                      fontFamily: t.fontFamily,
+                      textAlign: 'start',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Avatar name={userName} size="x-small" />
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <Text variant="contentSmall">{userName}</Text>
+                      <Text variant="legend">{userRole}</Text>
+                    </div>
+                  </button>
+                )
+              }
+            >
+              {ACCOUNT_LINKS.map((label) => (
+                <Menu.Item key={label} onSelect={() => onNavigate?.(label)}>
+                  {label}
+                </Menu.Item>
+              ))}
+            </Menu>
           </div>
 
           {/* Primary items */}
@@ -505,6 +529,7 @@ function ModernNav({
                             <Drilldown.Option
                               key={item.label}
                               id={item.label}
+                              onOptionClick={() => course.onSelect?.(item.label)}
                               renderAfterLabel={
                                 <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                   {item.unpublished && (
