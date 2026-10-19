@@ -47,3 +47,9 @@ body {
 .theme-switcher input[name='theme']:checked + label {
   background-color: var(--theme-selected);
 }
+
+/* Copy wizard steps are native buttons with their styles reset, so they need their own focus ring. */
+.wizard-step:focus-visible {
+  outline: 0.125rem solid currentColor;
+  outline-offset: 0.25rem;
+}
