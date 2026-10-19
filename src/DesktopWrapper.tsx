@@ -33,6 +33,7 @@ export type DesktopWrapperProps = {
   headerSlot?: ReactNode // custom content in the header, under the title
   actions?: ReactNode // the page's buttons. Light and Dark: a row under the header. Legacy: end of the title row.
   tabs?: ReactNode // optional page tabs (Tabs)
+  headerActions?: ReactNode // extra icon buttons in the header, next to AI agent, notifications and expand
   showFilters?: boolean // search, order by and the button that opens the Filters panel
   contentTabList?: ContentTabListConfig // optional in-page navigation, left of the content
   // Legacy only (the Canvas shell). Light and Dark ignore these.

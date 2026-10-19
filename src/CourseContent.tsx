@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, IconButton, IconNoteLine, SimpleSelect, Text } from '@instructure/ui/v11_7'
+import { Button, IconAddLine, IconNoteLine, IconSearchLine, Link, Menu, Table, Text } from '@instructure/ui/v11_7'
 import DesktopWrapper from './DesktopWrapper'
+import { ItemButtons, NotebookButton, ViewAsStudent } from './ItemActions'
 import NotebookPanel from './NotebookPanel'
 import type { Draft } from './NotebookPanel'
 import { NOTEBOOK_COURSE, courseMenu, itemById, itemsOf } from './notebookData'
@@ -96,43 +97,64 @@ export default function CourseContent({
   }
 
   const course = courseMenu(NOTEBOOK_COURSE, kind, onSelectMenu)
-  const noun = kind === 'Pages' ? 'Page' : 'Assignment'
-  const notebookButton = legacy ? (
-    <IconButton screenReaderLabel="Notebook" onClick={() => setPanelOpen((o) => !o)}>
-      <IconNoteLine />
-    </IconButton>
-  ) : (
-    <Button renderIcon={<IconNoteLine />} onClick={() => setPanelOpen((o) => !o)}>
-      Notebook
-    </Button>
-  )
+  const isPage = kind === 'Pages'
+  const toggle = () => setPanelOpen((o) => !o)
+  const notebook = <NotebookButton onClick={toggle} pressed={panelOpen} />
+  const noFill = { background: 'transparent' }
 
   return (
     <DesktopWrapper
       pageTitle={item.title}
-      breadcrumb={['Courses', NOTEBOOK_COURSE, kind]}
+      breadcrumb={isPage ? [NOTEBOOK_COURSE, 'Pages'] : [NOTEBOOK_COURSE, 'Assignments']}
       activeNav="Courses"
       course={course}
       onNavigate={onNavigate}
-      description={`${noun} in ${NOTEBOOK_COURSE}. Highlight text to make a note.`}
-      barActions={legacy ? notebookButton : undefined}
-      actions={legacy ? undefined : notebookButton}
+      description={`Highlight text to make a note, or open the Notebook for a note on the whole ${isPage ? 'page' : 'assignment'}.`}
+      // Legacy: the Notebook sits in the top bar at the far right, with View as Student. Light and Dark: in the
+      // header with the other icons.
+      barActions={
+        legacy ? (
+          <>
+            {notebook}
+            <ViewAsStudent />
+          </>
+        ) : undefined
+      }
+      headerActions={legacy ? undefined : notebook}
+      actions={<ItemButtons frontPage={isPage && item.id === 'week5'} />}
+      trailingContent={
+        isPage ? undefined : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.md }}>
+            <Text weight="bold" size="large">
+              Related Items
+            </Text>
+            <Link href="#" variant="standalone" onClick={(e: { preventDefault: () => void }) => e.preventDefault()}>
+              SpeedGrader
+            </Link>
+          </div>
+        )
+      }
+      trailingLabel="Related Items"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.xl, maxWidth: '47.5rem' }}>
-        <SimpleSelect
-          renderLabel={kind === 'Pages' ? 'Page' : 'Assignment'}
-          value={item.id}
-          onChange={(_e, { value }) => {
-            setPopup(null)
-            onItemChange(String(value))
-          }}
-        >
-          {items.map((i) => (
-            <SimpleSelect.Option key={i.id} id={i.id} value={i.id}>
-              {i.title}
-            </SimpleSelect.Option>
-          ))}
-        </SimpleSelect>
+        {isPage && (
+          <div>
+            <Menu
+              label="All pages"
+              trigger={<Button>View All Pages</Button>}
+              onSelect={(_e, value) => {
+                setPopup(null)
+                onItemChange(String(value))
+              }}
+            >
+              {items.map((i) => (
+                <Menu.Item key={i.id} value={i.id}>
+                  {i.title}
+                </Menu.Item>
+              ))}
+            </Menu>
+          </div>
+        )}
 
         <article
           ref={article}
@@ -145,30 +167,50 @@ export default function CourseContent({
               <Marked text={paragraph} quotes={itemNotes.flatMap((n) => (n.quote ? [n.quote] : []))} />
             </Text>
           ))}
-          {item.details && (
-            <dl
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'max-content 1fr',
-                gap: `${t.space.sm} ${t.space.xl}`,
-                margin: 0,
-              }}
-            >
-              {Object.entries({ Points: item.details.points, Submitting: item.details.submitting, Due: item.details.due }).map(
-                ([label, value]) => (
-                  <div key={label} style={{ display: 'contents' }}>
-                    <dt>
-                      <Text weight="bold">{label}</Text>
-                    </dt>
-                    <dd style={{ margin: 0 }}>
-                      <Text>{value}</Text>
-                    </dd>
-                  </div>
-                ),
-              )}
-            </dl>
-          )}
         </article>
+
+        {item.details && (
+          <>
+            <dl
+              style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: `${t.space.sm} ${t.space.xl}`, margin: 0 }}
+            >
+              {Object.entries({ Points: item.details.points, Submitting: item.details.submitting }).map(([label, value]) => (
+                <div key={label} style={{ display: 'contents' }}>
+                  <dt>
+                    <Text weight="bold">{label}</Text>
+                  </dt>
+                  <dd style={{ margin: 0 }}>
+                    <Text>{value}</Text>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <Table caption={() => 'Due dates'} themeOverride={noFill}>
+              <Table.Head themeOverride={noFill}>
+                <Table.Row themeOverride={noFill}>
+                  <Table.ColHeader themeOverride={noFill} id="due">Due</Table.ColHeader>
+                  <Table.ColHeader themeOverride={noFill} id="for">For</Table.ColHeader>
+                  <Table.ColHeader themeOverride={noFill} id="from">Available from</Table.ColHeader>
+                  <Table.ColHeader themeOverride={noFill} id="until">Until</Table.ColHeader>
+                </Table.Row>
+              </Table.Head>
+              <Table.Body themeOverride={noFill}>
+                <Table.Row themeOverride={noFill}>
+                  <Table.Cell themeOverride={noFill}>{item.details.due}</Table.Cell>
+                  <Table.Cell themeOverride={noFill}>Everyone</Table.Cell>
+                  <Table.Cell themeOverride={noFill}>-</Table.Cell>
+                  <Table.Cell themeOverride={noFill}>-</Table.Cell>
+                </Table.Row>
+              </Table.Body>
+            </Table>
+            {item.area === 'Assignments' && (
+              <div style={{ display: 'flex', gap: t.gapButtons }}>
+                <Button renderIcon={<IconAddLine />}>Create Rubric</Button>
+                <Button renderIcon={<IconSearchLine />}>Find Rubric</Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Shown next to the selected text. Students see "Mark important" and "Mark unclear" here, educators see one choice. */}

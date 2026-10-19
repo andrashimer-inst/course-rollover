@@ -43,6 +43,7 @@ export default function ModernWrapper({
   activeNav = 'Dashboard',
   course,
   onNavigate,
+  headerActions,
   fullWidth = false,
   description,
   headerSlot,
@@ -138,6 +139,7 @@ export default function ModernWrapper({
                     </div>
                     {/* Global actions: AI agent and notifications open a utility panel */}
                     <div style={{ display: 'flex', gap: t.gapButtons }}>
+                      {headerActions}
                       <IconButton
                         color="ai-primary"
                         screenReaderLabel={PANEL_LABEL.aiAgent}

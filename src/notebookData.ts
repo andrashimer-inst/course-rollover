@@ -47,6 +47,27 @@ export const COURSE_ITEMS: CourseItem[] = [
     ],
   },
   {
+    id: 'a1',
+    kind: 'Assignments',
+    area: 'Assignments',
+    title: `${CODE} Assignment 1: Reading response`,
+    body: [
+      'Read the two case studies from week 1 and write a short response of 300 words. Say which one you found more convincing and why.',
+    ],
+    details: { points: '10', submitting: 'A text entry', due: 'Sep 9 at 11:59pm' },
+  },
+  {
+    id: 'a2',
+    kind: 'Assignments',
+    area: 'Assignments',
+    title: `${CODE} Project proposal`,
+    body: [
+      'Describe the project you plan to build for your portfolio. Include the audience, the main goal and the tools you expect to use.',
+      'Keep it to one page. You can change the plan later, but tell me when you do.',
+    ],
+    details: { points: '15', submitting: 'A file upload', due: 'Oct 7 at 11:59pm' },
+  },
+  {
     id: 'a3',
     kind: 'Assignments',
     area: 'Assignments',
@@ -56,6 +77,14 @@ export const COURSE_ITEMS: CourseItem[] = [
       'Use the rubric below to check your work before you submit. Upload a PDF or a Word file.',
     ],
     details: { points: '20', submitting: 'A file upload', due: 'Oct 14 at 11:59pm' },
+  },
+  {
+    id: 'q1',
+    kind: 'Assignments',
+    area: 'Quizzes',
+    title: `${CODE} Quiz 1`,
+    body: ['This quiz covers the readings from weeks 1 and 2. You have 20 minutes and two attempts.'],
+    details: { points: '8', submitting: 'Nothing, taken in Canvas', due: 'Sep 16 at 11:59pm' },
   },
   {
     id: 'q2',
