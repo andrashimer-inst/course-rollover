@@ -14,6 +14,9 @@ import {
   TextInput,
 } from "@instructure/ui/v11_7";
 import DesktopWrapper from "./DesktopWrapper";
+import DesignCheckStep from "./DesignCheckStep";
+import { INITIAL_DESIGN, openRules } from "./designCheckData";
+import type { DesignState } from "./designCheckData";
 import FigmaAlert from "./FigmaAlert";
 import type { CourseNav } from "./GlobalNav";
 import StatusPill from "./StatusPill";
@@ -39,6 +42,7 @@ import type { CopySummary, Decision, EducatorComment, LinkAction } from "./rollo
 // The copy wizard. It opens when someone starts a copy, so the review happens before the copy
 // (discovery priority 1), not after it. Each step has a name that says what it covers:
 //   Review comments  what the last teaching team flagged
+//   Course design check  the course against the course design rules
 //   Fix dates        deadlines for the new term, with a preview and warnings (priority 7)
 //   Fix links        broken links and tools (priority 3)
 //   Summary          what came over and what didn't (priority 2)
@@ -58,13 +62,18 @@ const dateFieldProps = {
   invalidDateErrorMessage: "Enter a valid date",
 };
 
-type StepId = "comments" | "dates" | "links" | "summary";
+type StepId = "comments" | "design" | "dates" | "links" | "summary";
 const STEP_INFO: Record<StepId, { name: string; hint: string; lead: string }> =
   {
     comments: {
       name: "Review comments",
       hint: "What your team flagged",
       lead: "The team that taught this course last term left these comments. Decide what to do with each item before it is copied.",
+    },
+    design: {
+      name: "Course design check",
+      hint: "Rules for a clear course",
+      lead: "Check the course against the course design rules. Findings you leave open go into your to-do list after the copy.",
     },
     dates: {
       name: "Fix dates",
@@ -769,8 +778,8 @@ export default function RolloverWizard({
   const steps = useMemo<StepId[]>(
     () =>
       adjustDates
-        ? ["comments", "dates", "links", "summary"]
-        : ["comments", "links", "summary"],
+        ? ["comments", "design", "dates", "links", "summary"]
+        : ["comments", "design", "links", "summary"],
     [adjustDates],
   );
   const [step, setStep] = useState(0);
@@ -793,6 +802,7 @@ export default function RolloverWizard({
       })),
     [],
   );
+  const [design, setDesign] = useState<DesignState>(INITIAL_DESIGN);
   const [dates, setDates] = useState<DateRow[]>(initialDates);
   const [links, setLinks] = useState<LinkState>(() =>
     Object.fromEntries(
@@ -873,6 +883,9 @@ export default function RolloverWizard({
         ...FAILED_ITEMS.map((f) => `Copy failed for ${f.item}. ${f.fix}`),
         ...fixLater.map((c) => `${c.item}: ${c.text}`),
         ...unresolved.map((l) => `Fix the link "${l.label}" in ${l.where}.`),
+        ...openRules(design).map(
+          (r) => `Course design: ${r.title.replace(/\.$/, "")}.`,
+        ),
         "Check the quiz settings, the gradebook and the publish state.",
       ],
       datesShifted: adjusted - (adjustDates ? edited : 0),
@@ -884,6 +897,7 @@ export default function RolloverWizard({
     dates,
     initialDates,
     links,
+    design,
     adjustDates,
     course,
     when,
@@ -989,6 +1003,9 @@ export default function RolloverWizard({
                 decisions={decisions}
                 onDecide={(cid, d) => setDecisions({ ...decisions, [cid]: d })}
               />
+            )}
+            {id === "design" && (
+              <DesignCheckStep state={design} setState={setDesign} />
             )}
             {id === "dates" && <DatesStep rows={dates} setRows={setDates} />}
             {id === "links" && <LinksStep links={links} setLinks={setLinks} />}
