@@ -14,6 +14,7 @@ import {
   TextInput,
 } from "@instructure/ui/v11_7";
 import DesktopWrapper from "./DesktopWrapper";
+import CommentCard from "./CommentCard";
 import DesignCheckStep from "./DesignCheckStep";
 import { INITIAL_DESIGN, openRules } from "./designCheckData";
 import type { DesignState } from "./designCheckData";
@@ -26,7 +27,6 @@ import {
   BROKEN_LINKS,
   COPIED_COUNTS,
   DEADLINES,
-  DECISION_LABEL,
   FAILED_ITEMS,
   LINK_ACTION_LABEL,
   NEW_TERM_START,
@@ -41,8 +41,7 @@ import type { CopySummary, Decision, EducatorComment, LinkAction } from "./rollo
 
 // The copy wizard. It opens when someone starts a copy, so the review happens before the copy
 // (discovery priority 1), not after it. Each step has a name that says what it covers:
-//   Review comments  what the last teaching team flagged
-//   Course design check  the course against the course design rules
+//   Review course    what the last teaching team flagged, with the course design check beside it
 //   Fix dates        deadlines for the new term, with a preview and warnings (priority 7)
 //   Fix links        broken links and tools (priority 3)
 //   Summary          what came over and what didn't (priority 2)
@@ -62,18 +61,13 @@ const dateFieldProps = {
   invalidDateErrorMessage: "Enter a valid date",
 };
 
-type StepId = "comments" | "design" | "dates" | "links" | "summary";
+type StepId = "review" | "dates" | "links" | "summary";
 const STEP_INFO: Record<StepId, { name: string; hint: string; lead: string }> =
   {
-    comments: {
-      name: "Review comments",
-      hint: "What your team flagged",
-      lead: "The team that taught this course last term left these comments. Decide what to do with each item before it is copied.",
-    },
-    design: {
-      name: "Course design check",
-      hint: "Rules for a clear course",
-      lead: "Check the course against the course design rules. Findings you leave open go into your to-do list after the copy.",
+    review: {
+      name: "Review course",
+      hint: "Comments and design check",
+      lead: "Read what the last teaching team flagged and check the course against the design rules. Decide what to do with each item before it is copied.",
     },
     dates: {
       name: "Fix dates",
@@ -237,7 +231,7 @@ function Stepper({
   );
 }
 
-// ---- Step 1: educator comments -------------------------------------------------------------------------------
+// ---- Comments from the teaching team (first part of the Review course step) -------------------------------------------------------------------------------
 function CommentsStep({
   course,
   comments,
@@ -251,10 +245,16 @@ function CommentsStep({
 }) {
   const t = useSurfaceTokens();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: t.space.lg }}>
+    <section
+      aria-label="Comments from your team"
+      style={{ display: "flex", flexDirection: "column", gap: t.space.lg }}
+    >
+      <Heading level="h3" variant="titleCardRegular">
+        All comments from your team
+      </Heading>
       <Text as="p">
         {comments.length} comments from {course}, Fall 2025. We suggested a
-        choice for each one from the wording. Change it if you disagree.
+        choice for each one from the wording. Change it if you disagree. Comments about an item the design check flags also show under that item.
       </Text>
       <ul
         style={{
@@ -267,57 +267,16 @@ function CommentsStep({
         }}
       >
         {comments.map((c) => (
-          <li
+          <CommentCard
             key={c.id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) 15rem",
-              gap: t.space.xl,
-              alignItems: "start",
-              padding: t.space.lg,
-              background: t.containerColor,
-              border: `${t.borderWidth} solid ${t.borderColor}`,
-              borderRadius: t.radiusMd,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: t.space.sm,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  gap: t.space.sm,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                <StatusPill size="sm">{c.area}</StatusPill>
-                <Text weight="bold">{c.item}</Text>
-              </div>
-              <Text as="p">“{c.text}”</Text>
-              <Text size="small" color="secondary">
-                {c.author}, {c.term}
-              </Text>
-            </div>
-            <SimpleSelect
-              renderLabel={`What to do with ${c.item}`}
-              value={decisions[c.id]}
-              onChange={(_e, { value }) => onDecide(c.id, value as Decision)}
-            >
-              {(Object.keys(DECISION_LABEL) as Decision[]).map((d) => (
-                <SimpleSelect.Option key={d} id={`${c.id}-${d}`} value={d}>
-                  {DECISION_LABEL[d]}
-                </SimpleSelect.Option>
-              ))}
-            </SimpleSelect>
-          </li>
+            comment={c}
+            decision={decisions[c.id]}
+            onDecide={onDecide}
+            scope="list"
+          />
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
 
@@ -778,8 +737,8 @@ export default function RolloverWizard({
   const steps = useMemo<StepId[]>(
     () =>
       adjustDates
-        ? ["comments", "design", "dates", "links", "summary"]
-        : ["comments", "design", "links", "summary"],
+        ? ["review", "dates", "links", "summary"]
+        : ["review", "links", "summary"],
     [adjustDates],
   );
   const [step, setStep] = useState(0);
@@ -996,16 +955,22 @@ export default function RolloverWizard({
                 {STEP_INFO[id].lead}
               </Text>
             </div>
-            {id === "comments" && (
-              <CommentsStep
-                course={course}
-                comments={comments}
-                decisions={decisions}
-                onDecide={(cid, d) => setDecisions({ ...decisions, [cid]: d })}
-              />
-            )}
-            {id === "design" && (
-              <DesignCheckStep state={design} setState={setDesign} />
+            {id === "review" && (
+              <>
+                <DesignCheckStep
+                  state={design}
+                  setState={setDesign}
+                  comments={comments}
+                  decisions={decisions}
+                  onDecide={(cid, d) => setDecisions({ ...decisions, [cid]: d })}
+                />
+                <CommentsStep
+                  course={course}
+                  comments={comments}
+                  decisions={decisions}
+                  onDecide={(cid, d) => setDecisions({ ...decisions, [cid]: d })}
+                />
+              </>
             )}
             {id === "dates" && <DatesStep rows={dates} setRows={setDates} />}
             {id === "links" && <LinksStep links={links} setLinks={setLinks} />}

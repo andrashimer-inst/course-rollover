@@ -257,6 +257,7 @@ export const DESIGN_RULES: DesignRule[] = [
       { id: 'p2', kind: 'assignment', title: 'PT Project proposal' },
       { id: 'p3', kind: 'assignment', title: 'PT Assignment 3: Reflection' },
       { id: 'p4', kind: 'assignment', title: 'PT Quiz 2' },
+      { id: 'p16', kind: 'assignment', title: 'Week 3 discussion' },
     ],
   },
   {
@@ -271,6 +272,7 @@ export const DESIGN_RULES: DesignRule[] = [
       { id: 'p7', kind: 'link', title: 'Style guide' },
       { id: 'p8', kind: 'link', title: 'Feedback form' },
       { id: 'p9', kind: 'link', title: 'Library guide' },
+      { id: 'p17', kind: 'page', title: 'Week 5 overview' },
     ],
   },
   {

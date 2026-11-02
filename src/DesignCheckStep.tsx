@@ -6,6 +6,7 @@ import {
   IconArrowOpenDownLine,
   IconArrowOpenEndLine,
   IconAssignmentLine,
+  IconCommentLine,
   IconCompleteSolid,
   IconDocumentLine,
   IconExportLine,
@@ -25,8 +26,10 @@ import {
   Text,
   Tooltip,
 } from '@instructure/ui/v11_7'
+import CommentCard from './CommentCard'
 import FigmaAlert from './FigmaAlert'
 import { useSurfaceTokens } from './appTheme'
+import type { Decision, EducatorComment } from './rolloverData'
 import {
   COURSE_OBJECTIVES,
   DESIGN_RULES,
@@ -198,14 +201,22 @@ function ResourceRow({
   kind,
   severity,
   onRemove,
+  comments,
+  decisions,
+  onDecide,
 }: {
   resource: DesignResource
   kind: ResourceKind
   severity: Severity
   onRemove: () => void
+  // What the teaching team wrote about this item, so it can be read where the item is flagged.
+  comments: EducatorComment[]
+  decisions: Record<string, Decision>
+  onDecide: (id: string, d: Decision) => void
 }) {
   const t = useSurfaceTokens()
   const [open, setOpen] = useState(false)
+  const [reading, setReading] = useState(false)
   const line = `${t.borderWidth} solid ${t.borderColor}`
   return (
     <li style={{ borderTop: line }}>
@@ -216,6 +227,17 @@ function ResourceRow({
             {resource.title}
           </Link>
         </div>
+        {comments.length > 0 && (
+          <Button
+            size="small"
+            withBackground={false}
+            renderIcon={<IconCommentLine />}
+            aria-expanded={reading}
+            onClick={() => setReading((r) => !r)}
+          >
+            {reading ? 'Hide' : 'Read'} {comments.length === 1 ? 'team comment' : `${comments.length} team comments`}
+          </Button>
+        )}
         {severity !== 'pass' && (
           <>
             <IconButton
@@ -231,6 +253,28 @@ function ResourceRow({
           </>
         )}
       </div>
+      {reading && (
+        <ul
+          style={{
+            listStyle: 'none',
+            margin: `0 0 ${t.space.md}`,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: t.space.md,
+          }}
+        >
+          {comments.map((c) => (
+            <CommentCard
+              key={c.id}
+              comment={c}
+              decision={decisions[c.id]}
+              onDecide={onDecide}
+              scope={`${resource.id}`}
+            />
+          ))}
+        </ul>
+      )}
       {open && resource.reason && (
         <div
           style={{
@@ -250,7 +294,19 @@ function ResourceRow({
   )
 }
 
-function RuleRow({ rule, onRemove }: { rule: DesignRule; onRemove: (id: string) => void }) {
+function RuleRow({
+  rule,
+  onRemove,
+  comments,
+  decisions,
+  onDecide,
+}: {
+  rule: DesignRule
+  onRemove: (id: string) => void
+  comments: EducatorComment[]
+  decisions: Record<string, Decision>
+  onDecide: (id: string, d: Decision) => void
+}) {
   const t = useSurfaceTokens()
   const [open, setOpen] = useState(false)
   const line = `${t.borderWidth} solid ${t.borderColor}`
@@ -297,6 +353,9 @@ function RuleRow({ rule, onRemove }: { rule: DesignRule; onRemove: (id: string) 
                   kind={r.kind}
                   severity={rule.severity}
                   onRemove={() => onRemove(r.id)}
+                  comments={comments.filter((c) => c.item === r.title)}
+                  decisions={decisions}
+                  onDecide={onDecide}
                 />
               ))}
             </ul>
@@ -355,9 +414,15 @@ function exportCsv(rules: DesignRule[]) {
 export default function DesignCheckStep({
   state,
   setState,
+  comments,
+  decisions,
+  onDecide,
 }: {
   state: DesignState
   setState: (next: DesignState) => void
+  comments: EducatorComment[]
+  decisions: Record<string, Decision>
+  onDecide: (id: string, d: Decision) => void
 }) {
   const t = useSurfaceTokens()
   const [analyzing, setAnalyzing] = useState(false)
@@ -392,8 +457,12 @@ export default function DesignCheckStep({
     })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.xl }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: t.gapButtons, flexWrap: 'wrap' }}>
+    <section aria-label="Course design check" style={{ display: 'flex', flexDirection: 'column', gap: t.space.xl }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: t.gapButtons, flexWrap: 'wrap' }}>
+        <Heading level="h3" variant="titleCardRegular">
+          Course design check
+        </Heading>
+        <div style={{ display: 'flex', gap: t.gapButtons, flexWrap: 'wrap' }}>
         <Menu
           label="Rubrics"
           trigger={
@@ -413,6 +482,7 @@ export default function DesignCheckStep({
         <Button color="primary" interaction={analyzing ? 'disabled' : 'enabled'} onClick={analyze}>
           {state.analyzed ? 'Analyze Course again' : 'Analyze Course'}
         </Button>
+        </div>
       </div>
 
       {analyzing && (
@@ -464,6 +534,9 @@ export default function DesignCheckStep({
                     key={rule.id}
                     rule={rule}
                     onRemove={(id) => setState({ ...state, removed: [...state.removed, id] })}
+                    comments={comments}
+                    decisions={decisions}
+                    onDecide={onDecide}
                   />
                 ))}
               </ul>
@@ -471,6 +544,6 @@ export default function DesignCheckStep({
           </section>
         </>
       )}
-    </div>
+    </section>
   )
 }
