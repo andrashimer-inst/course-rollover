@@ -13,7 +13,9 @@ import {
   Text,
   TextInput,
 } from "@instructure/ui/v11_7";
+import DesktopWrapper from "./DesktopWrapper";
 import FigmaAlert from "./FigmaAlert";
+import type { CourseNav } from "./GlobalNav";
 import StatusPill from "./StatusPill";
 import { useSurfaceTokens } from "./appTheme";
 import {
@@ -750,10 +752,14 @@ export default function RolloverWizard({
   course,
   comments,
   adjustDates,
+  courseNav,
+  onNavigate,
   onCancel,
   onDone,
 }: {
   course: string;
+  courseNav: CourseNav;
+  onNavigate?: (label: string) => void;
   comments: EducatorComment[];
   adjustDates: boolean;
   onCancel: () => void;
@@ -912,32 +918,29 @@ export default function RolloverWizard({
     setStep(i);
     setReached((r) => Math.max(r, i));
   };
+  // Each step is a page view, so a new step starts at the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
   const startCopy = () => {
     setProgress(0);
     setCopying(true);
   };
 
   return (
-    <Modal
-      open
-      onDismiss={onCancel}
-      size="large"
-      label={`Copy content from ${course}`}
-      shouldCloseOnDocumentClick={false}
+    <DesktopWrapper
+      pageTitle={`Copy content from ${course}`}
+      breadcrumb={["Courses", courseNav.name, "Import Content"]}
+      activeNav="Courses"
+      course={courseNav}
+      onNavigate={onNavigate}
+      description="Review what comes with the copy before it runs."
+      fullWidth
     >
-      <Modal.Header>
-        <CloseButton
-          placement="end"
-          offset="small"
-          onClick={onCancel}
-          screenReaderLabel="Close"
-        />
-        <Heading level="h2">Copy content from {course}</Heading>
-        <div style={{ marginTop: t.space.lg }}>
-          <Stepper steps={steps} current={step} reached={reached} onGo={go} />
-        </div>
-      </Modal.Header>
-      <Modal.Body>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: t.space.xl }}
+      >
+        <Stepper steps={steps} current={step} reached={reached} onGo={go} />
         {copying ? (
           <div
             style={{
@@ -992,8 +995,12 @@ export default function RolloverWizard({
             {id === "summary" && <SummaryView summary={summary} />}
           </div>
         )}
-      </Modal.Body>
-      <Modal.Footer>
+        <div
+          style={{
+            paddingTop: t.space.lg,
+            borderTop: `${t.borderWidth} solid ${t.borderColor}`,
+          }}
+        >
         {id === "summary" ? (
           <Button color="primary" onClick={onCancel}>
             Done
@@ -1036,7 +1043,8 @@ export default function RolloverWizard({
             </div>
           </div>
         )}
-      </Modal.Footer>
-    </Modal>
+        </div>
+      </div>
+    </DesktopWrapper>
   );
 }

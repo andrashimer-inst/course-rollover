@@ -100,6 +100,22 @@ export default function CourseRollover({
     setImports([{ type: 'Course Copy', source: summary.course, date: `Just now`, status: 'Completed', summary }])
   }, [])
 
+  // The review and copy steps are a page of their own (a new level in the breadcrumb), not a dialog.
+  if (wizardCourse) {
+    return (
+      <RolloverWizard
+        key={wizardCourse}
+        course={wizardCourse}
+        courseNav={COURSE}
+        onNavigate={onNavigate}
+        comments={commentsForCopy(wizardCourse, notes)}
+        adjustDates={adjustDates}
+        onCancel={() => setWizardCourse(null)}
+        onDone={handleDone}
+      />
+    )
+  }
+
   return (
     <DesktopWrapper
       pageTitle="Import Content"
@@ -250,16 +266,6 @@ export default function CourseRollover({
         onCancel={() => setConfirmOpen(false)}
         onConfirm={confirmReplace}
       />
-      {wizardCourse && (
-        <RolloverWizard
-          key={wizardCourse}
-          course={wizardCourse}
-          comments={commentsForCopy(wizardCourse, notes)}
-          adjustDates={adjustDates}
-          onCancel={() => setWizardCourse(null)}
-          onDone={handleDone}
-        />
-      )}
       <Modal open={viewing !== null} onDismiss={() => setViewing(null)} size="large" label="Copy summary">
         <Modal.Header>
           <CloseButton placement="end" offset="small" onClick={() => setViewing(null)} screenReaderLabel="Close" />
