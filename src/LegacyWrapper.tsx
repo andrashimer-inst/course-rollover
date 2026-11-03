@@ -26,6 +26,7 @@ const FOOTER_LINKS = ['Privacy Policy', 'Cookie Notice', 'Acceptable Use Policy'
 export default function LegacyWrapper({
   pageTitle,
   breadcrumb = [],
+  onBreadcrumb,
   activeNav = 'Dashboard',
   course,
   fullWidth = false,
@@ -84,7 +85,14 @@ export default function LegacyWrapper({
             <div style={{ flex: 1, minWidth: 0 }}>
               <Breadcrumb label="You are here:" size="large">
                 {breadcrumb.map((crumb) => (
-                  <Breadcrumb.Link key={crumb} href="#">
+                  <Breadcrumb.Link
+                    key={crumb}
+                    href="#"
+                    onClick={(e: { preventDefault: () => void }) => {
+                      e.preventDefault()
+                      onBreadcrumb?.(crumb)
+                    }}
+                  >
                     {crumb}
                   </Breadcrumb.Link>
                 ))}

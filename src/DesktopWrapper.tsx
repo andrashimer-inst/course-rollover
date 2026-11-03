@@ -17,6 +17,8 @@ import { useAppThemeKey } from './appTheme'
 export type DesktopWrapperProps = {
   pageTitle: string
   breadcrumb?: string[]
+  // A level of the breadcrumb was clicked. Levels with no handler for them do nothing.
+  onBreadcrumb?: (crumb: string) => void
   activeNav?: NavKey
   // The course the user is in. Light and Dark show its menu in the Courses sub navigation; Legacy
   // shows it as a secondary navigation column of blue links (drawn by the wrapper).

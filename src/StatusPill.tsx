@@ -9,7 +9,7 @@ import { THEMES, useAppThemeKey } from './appTheme'
 // Keep the label to one or two words and pick the color by meaning (docs/components.md).
 
 type Size = 'xs' | 'sm' | 'md' | 'lg'
-type Color = 'neutral' | 'info' | 'warning' | 'success' | 'error'
+type Color = 'neutral' | 'info' | 'warning' | 'success' | 'error' | 'ai'
 
 // A token is a color, or { value, modify: { value } } for a color with transparency.
 function cssColor(token: unknown): string {
@@ -46,10 +46,25 @@ export default function StatusPill({
     md: { height: p.heightMedium, padX: p.paddingHorizontalMedium, font: p.textFontSizeMedium, gap: p.gapIconLabelMedium },
     lg: { height: p.heightLarge, padX: p.paddingHorizontalLarge, font: p.textFontSizeLarge, gap: p.gapIconLabelLarge },
   }[size]
-  const prefix = color === 'neutral' ? 'base' : color
-  const text = cssColor(p[`${prefix}TextColor`])
-  const border = cssColor(p[`${prefix}BorderColor`])
-  const background = cssColor(color === 'neutral' ? p.neutralBackgroundColor : p[`${color}BackgroundColor`])
+  const prefix = color === 'neutral' || color === 'ai' ? 'base' : color
+  let text = cssColor(p[`${prefix}TextColor`])
+  let border = cssColor(p[`${prefix}BorderColor`])
+  let background = cssColor(color === 'neutral' || color === 'ai' ? p.neutralBackgroundColor : p[`${color}BackgroundColor`])
+  // The Light error pill is a solid red block with white text, which looks out of place beside the tinted
+  // warning, success and info pills. In Light it gets the same tinted look from the error tokens.
+  // AI features get the purple of the AI colors (the pill has no AI color of its own).
+  if (color === 'ai') {
+    const purple = cssColor(semantic.color.background.aiTopGradient)
+    text = cssColor(semantic.color.text.aiColor)
+    border = key === 'legacy' ? purple : `color-mix(in srgb, ${purple} 40%, transparent)`
+    background = key === 'legacy' ? background : `color-mix(in srgb, ${purple} 16%, transparent)`
+  }
+  if (key === 'light' && color === 'error') {
+    const red = cssColor(semantic.color.background.error)
+    background = `color-mix(in srgb, ${red} 14%, transparent)`
+    border = `color-mix(in srgb, ${red} 30%, transparent)`
+    text = cssColor(semantic.color.text.error)
+  }
 
   return (
     <span

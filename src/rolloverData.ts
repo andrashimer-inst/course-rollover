@@ -196,13 +196,30 @@ export const FAILED_ITEMS: { item: string; type: string; reason: string; fix: st
   { item: 'Final project rubric', type: 'Rubrics', reason: 'The rubric is shared with a course you cannot access.', fix: 'Ask the course owner to share it.' },
 ]
 
+export type TodoItem = { group: string; title: string; detail: string }
+
+// One line of the copy history on the summary. Decisions are what the teacher chose, the rest is what Canvas did.
+export type HistoryEvent = {
+  when: string
+  tag: 'Session' | 'Created' | 'Decision' | 'Automatic'
+  text: string
+  who: string
+  link?: string
+}
+
 export type CopySummary = {
   course: string
+  // The course the content was copied into.
+  target: string
   when: string
+  // When students see the course, in words.
+  opens: string
+  stats: { created: number; relinked: number; sentToAdmin: number; datesPlaced: number }
   came: { type: string; count: number; changed: boolean }[]
   failed: { item: string; reason: string; fix: string }[]
   notCame: { item: string; reason: string; kind: 'left-out' | 'canvas' | 'attention' }[]
-  todo: string[]
+  todo: TodoItem[]
+  history: HistoryEvent[]
   datesShifted: number
   datesEdited: number
 }

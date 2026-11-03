@@ -2,26 +2,24 @@ import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   Button,
-  Checkbox,
-  CloseButton,
   Flex,
   Heading,
   Link,
-  Modal,
-  RadioInput,
-  RadioInputGroup,
   SimpleSelect,
-  IconSearchLine,
   Table,
   Text,
   View,
 } from '@instructure/ui/v11_7'
 import DesktopWrapper from './DesktopWrapper'
 import FigmaAlert from './FigmaAlert'
-import RolloverWizard, { ReplaceConfirm, SummaryView } from './RolloverWizard'
+import RolloverWizard from './RolloverWizard'
+import type { WizardDraft } from './RolloverWizard'
+import { SummaryView } from './CopySummaryView'
 import StatusPill from './StatusPill'
 import { useAppThemeKey } from './appTheme'
 import type { CopySummary } from './rolloverData'
+import { PREVIOUS_IMPORTS, newImport } from './sampleImports'
+import type { ImportRow } from './sampleImports'
 import { commentsForCopy } from './notebookData'
 import type { Note } from './notebookData'
 
@@ -45,13 +43,7 @@ const COURSE_NAV = [
 const COURSE = { name: 'Rollover', items: COURSE_NAV }
 const DESCRIPTION = 'Use the Import Content tool to migrate course materials from other sources into this course.'
 
-const CONTENT_TYPES = ['Copy a Canvas Course', 'Canvas Course Export Package', 'Zip file', 'QTI .zip file']
-const COURSES = ['Portfolio Test', 'Biology 101', 'Intro to Design', 'World History']
-
-type ImportRow = { type: string; source: string; date: string; status: string; summary?: CopySummary }
-
-// A copy already exists in this course, so a second copy has to ask before it replaces it.
-const FIRST_IMPORTS: ImportRow[] = [{ type: 'Course Copy', source: 'Portfolio Test', date: 'Sep 30 at 4:58am', status: 'Completed' }]
+const CONTENT_TYPES = ['Copy a Canvas course or learning objects', 'Canvas Course Export Package', 'Zip file', 'QTI .zip file']
 
 // Tables sit directly on the page background, so every table part gets a transparent fill.
 const noFill = { background: 'transparent' }
@@ -66,53 +58,83 @@ export default function CourseRollover({
   onNavigate?: (label: string) => void
 }) {
   const [contentType, setContentType] = useState(CONTENT_TYPES[0])
-  const [course, setCourse] = useState(COURSES[0])
-  const [includeCompleted, setIncludeCompleted] = useState(true)
-  const [content, setContent] = useState('all')
-  const [adjustDates, setAdjustDates] = useState(true)
-  const [imports, setImports] = useState<ImportRow[]>(FIRST_IMPORTS)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [wizardCourse, setWizardCourse] = useState<string | null>(null)
-  const [viewing, setViewing] = useState<CopySummary | null>(null)
+  const adjustDates = true
+  const [imports, setImports] = useState<ImportRow[]>(() => [...PREVIOUS_IMPORTS])
+  const [wizardOpen, setWizardOpen] = useState(false)
+  // A copy saved with "Save and continue later". It is picked up again on the step it was left on.
+  const [draft, setDraft] = useState<WizardDraft | null>(null)
+  const [resume, setResume] = useState(false)
+  // The import whose summary is open as a page. A copy is undone from its summary.
+  const [viewing, setViewing] = useState<ImportRow | null>(null)
+  const undo = (id: string) => setImports((list) => list.map((r) => (r.id === id ? { ...r, status: 'Undone' as const } : r)))
 
   const isCourseCopy = contentType === CONTENT_TYPES[0]
-  const existingCopy = imports.find((i) => i.type === 'Course Copy')
 
-  const clearAll = () => {
-    setContentType(CONTENT_TYPES[0])
-    setCourse('')
-    setIncludeCompleted(false)
-    setContent('all')
-    setAdjustDates(false)
-  }
-
-  // Starting a copy: ask first when it would replace an earlier copy, then open the review wizard.
-  const startCopy = () => {
-    if (!course) return
-    if (existingCopy) setConfirmOpen(true)
-    else setWizardCourse(course)
-  }
-  const confirmReplace = () => {
-    setConfirmOpen(false)
-    setWizardCourse(course)
-  }
+  const commentsFor = useCallback((c: string) => commentsForCopy(c, notes), [notes])
   const handleDone = useCallback((summary: CopySummary) => {
-    setImports([{ type: 'Course Copy', source: summary.course, date: `Just now`, status: 'Completed', summary }])
+    const row = newImport(summary)
+    setImports((list) => [row, ...list])
+    // When the copy is done the wizard closes and the summary opens as a page.
+    setWizardOpen(false)
+    setViewing(row)
   }, [])
 
   // The review and copy steps are a page of their own (a new level in the breadcrumb), not a dialog.
-  if (wizardCourse) {
+  if (wizardOpen) {
     return (
       <RolloverWizard
-        key={wizardCourse}
-        course={wizardCourse}
         courseNav={COURSE}
         onNavigate={onNavigate}
-        comments={commentsForCopy(wizardCourse, notes)}
+        commentsFor={commentsFor}
         adjustDates={adjustDates}
-        onCancel={() => setWizardCourse(null)}
-        onDone={handleDone}
+        onCancel={() => {
+          // Abandoning the session also drops a saved copy it was started from.
+          setWizardOpen(false)
+          setResume(false)
+          setDraft(null)
+        }}
+        onDone={(summary) => {
+          setDraft(null)
+          setResume(false)
+          handleDone(summary)
+        }}
+        draft={resume ? draft : null}
+        onSaveLater={(d) => {
+          setDraft(d)
+          setResume(false)
+          setWizardOpen(false)
+        }}
       />
+    )
+  }
+
+  // The summary of an earlier copy is a page of its own too, like the summary step of the wizard.
+  if (viewing) {
+    return (
+      <DesktopWrapper
+        pageTitle="Summary"
+        breadcrumb={['Courses', COURSE.name, 'Import Content']}
+        onBreadcrumb={(crumb) => crumb === 'Import Content' && setViewing(null)}
+        activeNav="Courses"
+        course={COURSE}
+        onNavigate={onNavigate}
+        description={`What came over from ${viewing.source} on ${viewing.summary?.when ?? viewing.date}.`}
+        fullWidth
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {viewing.summary && (
+            <SummaryView
+              summary={viewing.summary}
+              published={viewing.published}
+              undone={viewing.status === 'Undone'}
+              onUndo={() => undo(viewing.id)}
+            />
+          )}
+          <div>
+            <Button color="primary" onClick={() => setViewing(null)}>Done</Button>
+          </div>
+        </div>
+      </DesktopWrapper>
     )
   }
 
@@ -137,11 +159,6 @@ export default function CourseRollover({
                 <Text as="p">{DESCRIPTION}</Text>
               </LegacyOnly>
 
-              <FigmaAlert variant="warning" type="floating">
-                Previously imported content from the same course will be replaced. Manually added
-                content will remain.
-              </FigmaAlert>
-
               <SimpleSelect
                 renderLabel="Select Content Type"
                 value={contentType}
@@ -152,69 +169,20 @@ export default function CourseRollover({
                 ))}
               </SimpleSelect>
 
-              <SimpleSelect
-                renderLabel="Search for a course"
-                placeholder="Search..."
-                renderBeforeInput={<IconSearchLine />}
-                value={course}
-                onChange={(_e, { value }) => setCourse(String(value))}
-              >
-                {COURSES.map((c) => (
-                  <SimpleSelect.Option key={c} id={c} value={c}>{c}</SimpleSelect.Option>
-                ))}
-              </SimpleSelect>
-              <Checkbox
-                label="Include completed courses"
-                checked={includeCompleted}
-                onChange={() => setIncludeCompleted((v) => !v)}
-              />
-
-              <RadioInputGroup
-                name="content"
-                description="Content"
-                isRequired
-                value={content}
-                onChange={(_e, value) => setContent(value)}
-              >
-                <RadioInput
-                  value="all"
-                  label={
-                    <div>
-                      <Text>All content</Text>
-                      <Text as="p" variant="contentSmall">
-                        The following content types will be imported: Course Settings, Syllabus
-                        Body, Modules, Assignments, Quizzes, Question Banks, Discussion Topics,
-                        Pages, Announcements, Rubrics, Files, and Calendar Events.
-                      </Text>
-                      <Text as="p" variant="contentSmall">
-                        Feature Options aren't imported and must be enabled manually in the new
-                        course's Settings.
-                      </Text>
-                    </div>
-                  }
-                />
-                <RadioInput value="specific" label="Select specific content" />
-              </RadioInputGroup>
-
-              <Heading level="h3" variant="label">Options</Heading>
-              <Checkbox
-                label="Adjust events and due dates"
-                checked={adjustDates}
-                onChange={() => setAdjustDates((v) => !v)}
-              />
-              {isCourseCopy && (
-                <Text size="small" color="secondary">
-                  Before the copy you review the comments from last term{adjustDates ? ', fix the dates' : ''} and fix the broken
-                  links. After it you get a summary of what came over.
-                </Text>
+              {isCourseCopy && draft && (
+                <FigmaAlert variant="info" type="inline">
+                  You saved a copy {draft.course ? `from ${draft.course} ` : ''}on step {draft.step + 1} of 5. Nothing has been copied yet.
+                </FigmaAlert>
               )}
 
-              <Flex gap="gap.buttons">
-                <Button onClick={clearAll}>Clear</Button>
-                <Button color="primary" onClick={startCopy} interaction={isCourseCopy && !course ? 'disabled' : 'enabled'}>
-                  {isCourseCopy ? 'Review and copy' : 'Add to Import Queue'}
-                </Button>
-              </Flex>
+              {isCourseCopy && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <Button color="primary" onClick={() => { setResume(draft !== null); setWizardOpen(true) }}>
+                    {draft ? 'Continue copy' : 'Course copy wizard'}
+                  </Button>
+                  {draft && <Button onClick={() => setDraft(null)}>Discard saved copy</Button>}
+                </div>
+              )}
             </Flex>
 
             <View as="section" aria-labelledby="content-imports" borderWidth="small 0 0 0" padding="gap.inputs.vertical 0 0 0">
@@ -234,20 +202,24 @@ export default function CourseRollover({
                   </Table.Head>
                   <Table.Body themeOverride={noFill}>
                     {imports.map((row) => (
-                      <Table.Row themeOverride={noFill} key={row.source + row.date}>
+                      <Table.Row themeOverride={noFill} key={row.id}>
                         <Table.Cell themeOverride={noFill}>{row.type}</Table.Cell>
                         <Table.Cell themeOverride={noFill}>
                           <Link href="#" onClick={(e: { preventDefault: () => void }) => e.preventDefault()}>{row.source}</Link>
                         </Table.Cell>
                         <Table.Cell themeOverride={noFill}>{row.date}</Table.Cell>
-                        <Table.Cell themeOverride={noFill}><StatusPill color="success">{row.status}</StatusPill></Table.Cell>
+                        <Table.Cell themeOverride={noFill}>
+                          <StatusPill color={row.status === 'Completed' ? 'success' : row.status === 'Failed' ? 'error' : 'neutral'}>{row.status}</StatusPill>
+                        </Table.Cell>
                         <Table.Cell themeOverride={noFill} />
                         <Table.Cell themeOverride={noFill}>
-                          {row.summary && (
-                            <Link href="#" onClick={(e: { preventDefault: () => void }) => { e.preventDefault(); setViewing(row.summary!) }}>
-                              View summary
-                            </Link>
-                          )}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
+                            {row.summary && (
+                              <Link href="#" onClick={(e: { preventDefault: () => void }) => { e.preventDefault(); setViewing(row) }}>
+                                View summary
+                              </Link>
+                            )}
+                          </div>
                         </Table.Cell>
                       </Table.Row>
                     ))}
@@ -259,23 +231,6 @@ export default function CourseRollover({
         </View>
       </Flex>
 
-      <ReplaceConfirm
-        open={confirmOpen}
-        source={existingCopy?.source ?? ''}
-        copiedOn={existingCopy?.date ?? ''}
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={confirmReplace}
-      />
-      <Modal open={viewing !== null} onDismiss={() => setViewing(null)} size="large" label="Copy summary">
-        <Modal.Header>
-          <CloseButton placement="end" offset="small" onClick={() => setViewing(null)} screenReaderLabel="Close" />
-          <Heading level="h2">Summary of the copy from {viewing?.course}</Heading>
-        </Modal.Header>
-        <Modal.Body>{viewing && <SummaryView summary={viewing} />}</Modal.Body>
-        <Modal.Footer>
-          <Button color="primary" onClick={() => setViewing(null)}>Close</Button>
-        </Modal.Footer>
-      </Modal>
     </DesktopWrapper>
   )
 }

@@ -40,6 +40,7 @@ const PANEL_LABEL: Record<PanelKey, string> = {
 export default function ModernWrapper({
   pageTitle,
   breadcrumb = [],
+  onBreadcrumb,
   activeNav = 'Dashboard',
   course,
   onNavigate,
@@ -130,7 +131,14 @@ export default function ModernWrapper({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <Breadcrumb label="You are here:">
                         {breadcrumb.map((crumb) => (
-                          <Breadcrumb.Link key={crumb} href="#">
+                          <Breadcrumb.Link
+                    key={crumb}
+                    href="#"
+                    onClick={(e: { preventDefault: () => void }) => {
+                      e.preventDefault()
+                      onBreadcrumb?.(crumb)
+                    }}
+                  >
                             {crumb}
                           </Breadcrumb.Link>
                         ))}
