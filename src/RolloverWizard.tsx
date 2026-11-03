@@ -1,0 +1,586 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  CircleCheckInstUIIcon,
+  CloseButton,
+  Heading,
+  Modal,
+  ProgressBar,
+  ScreenReaderContent,
+  Text,
+} from "@instructure/ui/v11_7";
+import DesktopWrapper from "./DesktopWrapper";
+import ContentStep from "./ContentStep";
+import { nothingPicked, typesComing } from "./contentHelpers";
+import type { CopyMode, Picked, Scope } from "./contentHelpers";
+import ContentLoader from "./ContentLoader";
+import SelectCourseStep from "./SelectCourseStep";
+import FixDatesStep from "./FixDatesStep";
+import ReviewAndCopyStep from "./ReviewAndCopyStep";
+import { buildHistory } from "./copyHistory";
+import { INITIAL_OPENING, OPENING_TIME, buildTodo, readiness } from "./reviewCopyData";
+import type { Opening } from "./reviewCopyData";
+import { DATE_ITEMS, INITIAL_DATES, dateCounts } from "./fixDatesData";
+import type { FixDatesState } from "./fixDatesData";
+import LearningObjectReview from "./LearningObjectReview";
+import { buildRows, choiceOf, hiddenModules } from "./reviewData";
+import type { Choice, DupeChoice } from "./reviewData";
+import type { CourseNav } from "./GlobalNav";
+import { useSurfaceTokens } from "./appTheme";
+import {
+  AREA_TO_TYPE,
+  COPIED_COUNTS,
+  FAILED_ITEMS,
+} from "./rolloverData";
+import type { CopySummary, EducatorComment } from "./rolloverData";
+
+// The copy wizard. It opens when someone starts a copy, so the review happens before the copy
+// (discovery priority 1), not after it. Each step has a name that says what it covers:
+//   Learning object review  each item checked against the design rules and the team's comments, with a choice per item
+//   Fix dates        deadlines for the new term, with a preview and warnings (priority 7)
+//   Review and copy  readiness check, final preview and a to-do list. The copy starts here
+//   Summary          what came over and what didn't (priority 2)
+// Sample data only.
+
+type StepId = "select" | "content" | "review" | "dates" | "copy";
+const STEP_INFO: Record<StepId, { name: string; hint: string; lead: string }> =
+  {
+    select: {
+      name: "Select course",
+      hint: "Choose the source",
+      lead: "Choose the course you want to copy content from. You can only pick one.",
+    },
+    content: {
+      name: "What comes over",
+      hint: "The whole course or part of it",
+      lead: "Choose if the whole course comes over, or only some learning objects.",
+    },
+    review: {
+      name: "Learning object review",
+      hint: "Check each item",
+      lead: "Each item is checked against the course design rules and your team's comments. Choose what to do with each one before it is copied.",
+    },
+    dates: {
+      name: "Fix dates",
+      hint: "Deadlines for the new term",
+      lead: "Move every deadline to the new term. Check the preview and fix anything flagged before you copy.",
+    },
+    copy: {
+      name: "Review and copy",
+      hint: "Readiness check and final preview",
+      lead: "Check the course is ready and look at the final preview. The copy starts when you choose Copy content. Your to-do list comes with the summary afterwards.",
+    },
+  };
+
+// ---- Step indicator -----------------------------------------------------------------------------------------
+function Stepper({
+  steps,
+  current,
+  reached,
+  onGo,
+}: {
+  steps: StepId[];
+  current: number;
+  reached: number;
+  onGo: (i: number) => void;
+}) {
+  const t = useSurfaceTokens();
+  return (
+    <ol
+      aria-label="Copy steps"
+      style={{
+        display: "flex",
+        gap: t.space.lg,
+        listStyle: "none",
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      {steps.map((id, i) => {
+        const done = i < current;
+        const isCurrent = i === current;
+        const color = isCurrent
+          ? t.linkColor
+          : done
+            ? t.successTextColor
+            : t.mutedTextColor;
+        return (
+          <li
+            key={id}
+            aria-current={isCurrent ? "step" : undefined}
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            <button
+              type="button"
+              className="wizard-step"
+              // Only the steps already reached can be opened, so nothing is skipped.
+              disabled={i > reached}
+              onClick={() => onGo(i)}
+              style={{
+                all: "unset",
+                boxSizing: "border-box",
+                width: "100%",
+                display: "flex",
+                gap: t.space.sm,
+                alignItems: "flex-start",
+                cursor: i > reached ? "default" : "pointer",
+                paddingTop: t.space.sm,
+                borderTop: `0.25rem solid ${isCurrent ? t.linkColor : done ? t.successTextColor : t.borderColor}`,
+                color: t.textColor,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  flexShrink: 0,
+                  width: "1.5rem",
+                  height: "1.5rem",
+                  boxSizing: "border-box",
+                  borderRadius: "50%",
+                  border: done ? "none" : `0.125rem solid ${color}`,
+                  color,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.875rem",
+                  fontWeight: 700,
+                }}
+              >
+                {done ? <CircleCheckInstUIIcon /> : i + 1}
+              </span>
+              <span style={{ display: "flex", flexDirection: "column" }}>
+                <Text weight={isCurrent ? "bold" : "normal"}>
+                  {STEP_INFO[id].name}
+                </Text>
+                <Text size="small" color="secondary">
+                  {STEP_INFO[id].hint}
+                </Text>
+                <ScreenReaderContent>
+                  {done ? "Done" : isCurrent ? "Current step" : ""}
+                </ScreenReaderContent>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// What "Save and continue later" keeps, so the copy can be picked up again on the same step.
+export type WizardDraft = {
+  course: string;
+  scope: Scope | null;
+  picked: Picked;
+  mode: CopyMode;
+  step: number;
+  reached: number;
+  choices: Record<string, Choice>;
+  dupes: Record<string, DupeChoice>;
+  dates: FixDatesState;
+  readyRan: boolean;
+  opening: Opening;
+};
+
+// ---- The wizard ----------------------------------------------------------------------------------------------
+export default function RolloverWizard({
+  commentsFor,
+  adjustDates,
+  courseNav,
+  onNavigate,
+  onCancel,
+  onDone,
+  draft,
+  onSaveLater,
+}: {
+  // The comments for the chosen course. The course is picked in the first step.
+  commentsFor: (course: string) => EducatorComment[];
+  courseNav: CourseNav;
+  onNavigate?: (label: string) => void;
+  adjustDates: boolean;
+  onCancel: () => void;
+  onDone: (summary: CopySummary) => void;
+  // A saved copy to carry on with, and what to do when the educator saves one.
+  draft?: WizardDraft | null;
+  onSaveLater: (draft: WizardDraft) => void;
+}) {
+  const t = useSurfaceTokens();
+  // Leaving the wizard (Cancel or the breadcrumb) asks first, so a copy in progress is not dropped by accident.
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const steps = useMemo<StepId[]>(
+    () =>
+      adjustDates
+        ? ["select", "content", "review", "dates", "copy"]
+        : ["select", "content", "review", "copy"],
+    [adjustDates],
+  );
+  // The steps start empty. Each step needs a choice before the next one opens.
+  const [course, setCourse] = useState(draft?.course ?? "");
+  const comments = useMemo(
+    () => (course ? commentsFor(course) : []),
+    [commentsFor, course],
+  );
+  const [scope, setScope] = useState<Scope | null>(draft?.scope ?? null);
+  const [picked, setPicked] = useState<Picked>(draft?.picked ?? {});
+  const [mode, setMode] = useState<CopyMode>(draft?.mode ?? "merge");
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [step, setStep] = useState(draft?.step ?? 0);
+  const [reached, setReached] = useState(draft?.reached ?? 0);
+  const [copying, setCopying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [when] = useState(() =>
+    new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+  );
+  // What the educator chose for each learning object, and which of two similar modules to keep.
+  const [choices, setChoices] = useState<Record<string, Choice>>(draft?.choices ?? {});
+  const [dupes, setDupes] = useState<Record<string, DupeChoice>>(draft?.dupes ?? {});
+  const rows = useMemo(
+    () => buildRows(scope ?? "whole", picked, comments),
+    [scope, picked, comments],
+  );
+  // Choosing another course starts the review over.
+  const [reviewedFor, setReviewedFor] = useState(draft?.course ?? "");
+  if (reviewedFor !== course) {
+    setReviewedFor(course);
+    setChoices({});
+    setDupes({});
+  }
+  const [dates, setDates] = useState<FixDatesState>(draft?.dates ?? INITIAL_DATES);
+  // Whether the readiness check has run on the Review and copy step.
+  const [readyRan, setReadyRan] = useState(draft?.readyRan ?? false);
+  const [opening, setOpening] = useState<Opening>(draft?.opening ?? INITIAL_OPENING);
+  const summary = useMemo<CopySummary>(() => {
+    const AREA: Record<string, string> = {
+      assignments: "Assignments",
+      quizzes: "Quizzes",
+      pages: "Pages",
+      discussions: "Discussions",
+      files: "Files",
+    };
+    const asItem = (r: (typeof rows)[number]) => ({
+      item: r.title,
+      area: AREA[r.typeId] ?? r.kindLabel,
+      text: r.findings[0]?.rule.title ?? r.note?.text ?? "Check it after the copy.",
+    });
+    const left = rows
+      .filter((r) => choiceOf(r, choices) === "leave")
+      .map(asItem);
+    const fixLater = rows
+      .filter((r) => choiceOf(r, choices) === "fix")
+      .map(asItem);
+    const { shifted, edited } = dateCounts(dates);
+    // The broken links are fixed in the learning object review now. The AI fix swaps them in the pages.
+    const linksFixed = rows.some((r) => r.id === "course:links" && choiceOf(r, choices) === "aifix");
+    const types = new Set(fixLater.map((c) => AREA_TO_TYPE[c.area]));
+    const came = COPIED_COUNTS.map((c) => ({
+      type: c.type,
+      count:
+        c.count -
+        left.filter((l) => AREA_TO_TYPE[l.area] === c.type).length -
+        FAILED_ITEMS.filter((f) => f.type === c.type).length,
+      changed:
+        types.has(c.type) ||
+        (adjustDates &&
+          ["Assignments", "Quizzes", "Discussions", "Calendar events"].includes(
+            c.type,
+          )) ||
+        (linksFixed && c.type === "Pages"),
+    }));
+    const opens =
+      opening.mode === "open"
+        ? `It opens on ${OPENING_TIME}.`
+        : "You open it yourself. The course stays unpublished until you publish it.";
+    return {
+      course,
+      target: courseNav.name,
+      when,
+      opens,
+      stats: {
+        // The learning objects that come over. The course-wide fixes are not items of their own.
+        created: rows.filter((r) => !r.courseWide && choiceOf(r, choices) !== "leave").length,
+        relinked: 3,
+        sentToAdmin: 1,
+        datesPlaced: dates.mode === "clear" || !adjustDates ? 0 : DATE_ITEMS.length,
+      },
+      history: buildHistory({ rows, choices, opens: opening.mode === "open" ? OPENING_TIME : "when you open it" }),
+      came,
+      failed: FAILED_ITEMS.map(({ item, reason, fix }) => ({
+        item,
+        reason,
+        fix,
+      })),
+      notCame: [
+        ...left.map((c) => ({
+          item: c.item,
+          reason: "you chose to leave it out",
+          kind: "left-out" as const,
+        })),
+        {
+          item: "Student submissions and grades",
+          reason: "Canvas never copies these.",
+          kind: "canvas" as const,
+        },
+        {
+          item: "Enrollments and groups",
+          reason: "Add people to the new course.",
+          kind: "canvas" as const,
+        },
+        {
+          item: "Feature options",
+          reason: "Turn them on again in Settings.",
+          kind: "canvas" as const,
+        },
+      ],
+      todo: [
+        ...FAILED_ITEMS.map((f) => ({ group: "Fix after the copy", title: `Copy failed: ${f.item}`, detail: f.fix })),
+        // The list is gathered from the choices made in the steps before.
+        ...buildTodo({ rows, choices, ready: readiness(rows, choices), dates, comments, opening }),
+      ],
+      datesShifted: adjustDates ? shifted : 0,
+      datesEdited: adjustDates ? edited : 0,
+    };
+  }, [
+    rows,
+    choices,
+    dates,
+    comments,
+    opening,
+    adjustDates,
+    courseNav.name,
+    course,
+    when,
+  ]);
+
+  // The copy takes a moment. The progress bar moves, then the summary shows.
+  useEffect(() => {
+    if (!copying) return;
+    const timer = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) return p;
+        return Math.min(100, p + 12);
+      });
+    }, 180);
+    return () => clearInterval(timer);
+  }, [copying]);
+  useEffect(() => {
+    if (!copying || progress < 100) return;
+    const done = setTimeout(() => {
+      // The summary is a page of its own: the parent shows it when the copy is done.
+      setCopying(false);
+      onDone(summary);
+    }, 400);
+    return () => clearTimeout(done);
+  }, [copying, progress, onDone, summary]);
+
+  const id = steps[step];
+  // Nothing to lose before anything is chosen, so it only asks once the copy has been started.
+  const leave = () => (course || step > 0 ? setConfirmLeave(true) : onCancel());
+  // The copy runs from the last step.
+  const atCopy = id === "copy";
+  const go = (i: number) => {
+    setStep(i);
+    setReached((r) => Math.max(r, i));
+  };
+  // Each step is a page view, so a new step starts at the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
+  const finishLoading = useCallback(() => {
+    setLoadingContent(false);
+    setStep((st) => st + 1);
+    setReached((r) => Math.max(r, step + 1));
+  }, [step]);
+  const startCopy = () => {
+    setProgress(0);
+    setCopying(true);
+  };
+
+  return (
+    <DesktopWrapper
+      pageTitle={course ? `Copy content from ${course}` : "Course copy wizard"}
+      breadcrumb={["Courses", courseNav.name, "Import Content"]}
+      // "Import Content" goes back to the page the wizard started from.
+      onBreadcrumb={(crumb) => crumb === "Import Content" && leave()}
+      activeNav="Courses"
+      course={courseNav}
+      onNavigate={onNavigate}
+      description="Review what comes with the copy before it runs."
+      fullWidth
+    >
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: t.space.xl }}
+      >
+        <Stepper steps={steps} current={step} reached={reached} onGo={go} />
+        {loadingContent ? (
+          <ContentLoader types={typesComing(scope ?? "whole", picked)} onDone={finishLoading} />
+        ) : copying ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: t.space.lg,
+              padding: `${t.space.xxl} 0`,
+            }}
+          >
+            <Heading level="h3" variant="titleCardRegular">
+              Copying content
+            </Heading>
+            <ProgressBar
+              screenReaderLabel="Copying content"
+              valueNow={progress}
+              valueMax={100}
+              renderValue={({ valueNow }) => `${valueNow}%`}
+            />
+            <Text color="secondary">
+              Applying your choices from the review.
+            </Text>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: t.space.xl,
+            }}
+          >
+            {/* The step title on the left, "Save and continue later" at the right end of the same row. */}
+            <div style={{ display: "flex", gap: t.space.md, alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                <Heading level="h3" variant="titleSection">
+                  {`Step ${step + 1} of ${steps.length}: `}
+                  {STEP_INFO[id].name}
+                </Heading>
+                <Text as="p" color="secondary">
+                  {STEP_INFO[id].lead}
+                </Text>
+              </div>
+              <Button
+                // Always on the first line of the row, level with the top of the step title.
+                onClick={() =>
+                  onSaveLater({ course, scope, picked, mode, step, reached, choices, dupes, dates, readyRan, opening })
+                }
+              >
+                Save and continue later
+              </Button>
+            </div>
+            {id === "select" && (
+              <SelectCourseStep selected={course} onSelect={setCourse} />
+            )}
+            {id === "content" && (
+              <ContentStep
+                scope={scope}
+                setScope={setScope}
+                picked={picked}
+                setPicked={setPicked}
+                mode={mode}
+                setMode={setMode}
+                hidden={hiddenModules(dupes)}
+              />
+            )}
+            {id === "review" && (
+              <LearningObjectReview
+                rows={rows}
+                choices={choices}
+                setChoices={setChoices}
+                scope={scope ?? "whole"}
+                mode={mode}
+                picked={picked}
+                dupes={dupes}
+              />
+            )}
+            {id === "dates" && <FixDatesStep state={dates} setState={setDates} />}
+            {id === "copy" && (
+              <ReviewAndCopyStep
+                rows={rows}
+                choices={choices}
+                scope={scope ?? "whole"}
+                mode={mode}
+                picked={picked}
+                dupes={dupes}
+                dates={dates}
+                readyRan={readyRan}
+                setReadyRan={setReadyRan}
+                opening={opening}
+                setOpening={setOpening}
+              />
+            )}
+          </div>
+        )}
+        <div
+          style={{
+            paddingTop: t.space.lg,
+            borderTop: `${t.borderWidth} solid ${t.borderColor}`,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: t.gapButtons,
+              width: "100%",
+              justifyContent: "space-between",
+            }}
+          >
+            <Button
+              onClick={leave}
+              interaction={copying || loadingContent ? "disabled" : "enabled"}
+            >
+              Cancel
+            </Button>
+            <div style={{ display: "flex", gap: t.gapButtons }}>
+              <Button
+                onClick={() => go(step - 1)}
+                interaction={step === 0 || copying || loadingContent ? "disabled" : "enabled"}
+              >
+                Back
+              </Button>
+              {atCopy ? (
+                <Button
+                  color="primary"
+                  onClick={startCopy}
+                  interaction={copying ? "disabled" : "enabled"}
+                >
+                  Copy content
+                </Button>
+              ) : (
+                <Button
+                  color="primary"
+                  onClick={() =>
+                    id === "content" ? setLoadingContent(true) : go(step + 1)
+                  }
+                  interaction={
+                    loadingContent ||
+                    (id === "select" && !course) ||
+                    (id === "content" && (scope === null || (scope === "part" && nothingPicked(picked))))
+                      ? "disabled"
+                      : "enabled"
+                  }
+                >
+                  Next: {STEP_INFO[steps[step + 1]].name}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      <Modal open={confirmLeave} onDismiss={() => setConfirmLeave(false)} size="small" label="Abandon the copy" shouldCloseOnDocumentClick={false}>
+        <Modal.Header>
+          <CloseButton placement="end" offset="small" onClick={() => setConfirmLeave(false)} screenReaderLabel="Close" />
+          <Heading level="h2">Abandon the copy?</Heading>
+        </Modal.Header>
+        <Modal.Body>
+          <Text as="p">
+            You are about to leave the copy session. Nothing has been copied yet, and the choices you made are lost. To keep them, choose Save and continue later instead.
+          </Text>
+        </Modal.Body>
+        <Modal.Footer>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <Button onClick={() => setConfirmLeave(false)}>Keep working</Button>
+            <Button color="danger" onClick={() => { setConfirmLeave(false); onCancel(); }}>
+              Yes, abandon the copy
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
+    </DesktopWrapper>
+  );
+}

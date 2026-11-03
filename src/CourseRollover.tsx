@@ -1,16 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   Button,
-  Checkbox,
-  DateInput,
   Flex,
   Heading,
-  IconAddLine,
-  IconSearchLine,
   Link,
-  Pill,
-  RadioInput,
-  RadioInputGroup,
   SimpleSelect,
   Table,
   Text,
@@ -18,11 +12,22 @@ import {
 } from '@instructure/ui/v11_7'
 import DesktopWrapper from './DesktopWrapper'
 import FigmaAlert from './FigmaAlert'
+import RolloverWizard from './RolloverWizard'
+import type { WizardDraft } from './RolloverWizard'
+import { SummaryView } from './CopySummaryView'
+import StatusPill from './StatusPill'
 import { useAppThemeKey } from './appTheme'
+import type { CopySummary } from './rolloverData'
+import { PREVIOUS_IMPORTS, newImport } from './sampleImports'
+import type { ImportRow } from './sampleImports'
+import { commentsForCopy } from './notebookData'
+import type { Note } from './notebookData'
 
-// Course Rollover: "Import Content" page, rebuilt on the template with the rules in
-// docs/compare.md: Figma decides the design, the package decides what exists, new-theme (v2)
-// components only, spacing from docs/spacing.md through the `gap` and `margin` token props.
+// Course Rollover: "Import Content" page, built on the template. Figma decides the design, the package
+// decides what exists, new-theme (v2) components only, spacing from docs/spacing.md.
+// Changes from the customer discovery (top 10 priorities):
+//   starting a copy opens a review wizard first (comments, dates, links), then a summary of what came over
+//   copying over an existing copy asks for confirmation first
 // Sample data only.
 
 // Course menu (sample). Unpublished items are marked like in Canvas. Import Content lives under Settings.
@@ -38,69 +43,99 @@ const COURSE_NAV = [
 const COURSE = { name: 'Rollover', items: COURSE_NAV }
 const DESCRIPTION = 'Use the Import Content tool to migrate course materials from other sources into this course.'
 
-const CONTENT_TYPES = ['Copy a Canvas Course', 'Canvas Course Export Package', 'Zip file', 'QTI .zip file']
-const COURSES = ['Portfolio Test', 'Biology 101', 'Intro to Design', 'World History']
-
-const IMPORTS = [
-  { type: 'Course Copy', source: 'Portfolio Test', date: 'Sep 30 at 4:58am', status: 'Completed' },
-]
+const CONTENT_TYPES = ['Copy a Canvas course or learning objects', 'Canvas Course Export Package', 'Zip file', 'QTI .zip file']
 
 // Tables sit directly on the page background, so every table part gets a transparent fill.
 const noFill = { background: 'transparent' }
 
-const dateFieldProps = {
-  screenReaderLabels: {
-    calendarIcon: 'Open calendar',
-    prevMonthButton: 'Previous month',
-    nextMonthButton: 'Next month',
-    datePickerDialog: 'Date picker',
-    selectedLabel: 'Selected',
-  },
-  placeholder: 'Select a date',
-  width: '16rem',
-  invalidDateErrorMessage: 'Enter a valid date',
-}
-
-function DateChange({ label }: { label: string }) {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  return (
-    <Flex alignItems="end" wrap="wrap" gap="gap.inputs.horizontal">
-      <DateInput
-        {...dateFieldProps}
-        renderLabel={label}
-        value={from}
-        onChange={(_e, inputValue) => setFrom(inputValue)}
-      />
-      <View as="div" padding="0 0 general.spaceSm 0">
-        <Text>change to</Text>
-      </View>
-      <DateInput
-        {...dateFieldProps}
-        renderLabel={<span style={{ visibility: 'hidden' }}>{label} new date</span>}
-        value={to}
-        onChange={(_e, inputValue) => setTo(inputValue)}
-      />
-    </Flex>
-  )
-}
-
-export default function CourseRollover() {
-  const themeKey = useAppThemeKey()
+export default function CourseRollover({
+  notes = [],
+  onNavigate,
+}: {
+  // The educator's notebook notes. They show up in the wizard's Review comments step.
+  notes?: Note[]
+  // A global nav item was chosen (for example Notebook in the Account menu or tray).
+  onNavigate?: (label: string) => void
+}) {
   const [contentType, setContentType] = useState(CONTENT_TYPES[0])
-  const [course, setCourse] = useState(COURSES[0])
-  const [includeCompleted, setIncludeCompleted] = useState(true)
-  const [content, setContent] = useState('all')
-  const [adjustDates, setAdjustDates] = useState(true)
-  const [adjustment, setAdjustment] = useState('shift')
+  const adjustDates = true
+  const [imports, setImports] = useState<ImportRow[]>(() => [...PREVIOUS_IMPORTS])
+  const [wizardOpen, setWizardOpen] = useState(false)
+  // A copy saved with "Save and continue later". It is picked up again on the step it was left on.
+  const [draft, setDraft] = useState<WizardDraft | null>(null)
+  const [resume, setResume] = useState(false)
+  // The import whose summary is open as a page. A copy is undone from its summary.
+  const [viewing, setViewing] = useState<ImportRow | null>(null)
+  const undo = (id: string) => setImports((list) => list.map((r) => (r.id === id ? { ...r, status: 'Undone' as const } : r)))
 
-  const clearAll = () => {
-    setContentType(CONTENT_TYPES[0])
-    setCourse('')
-    setIncludeCompleted(false)
-    setContent('all')
-    setAdjustDates(false)
-    setAdjustment('shift')
+  const isCourseCopy = contentType === CONTENT_TYPES[0]
+
+  const commentsFor = useCallback((c: string) => commentsForCopy(c, notes), [notes])
+  const handleDone = useCallback((summary: CopySummary) => {
+    const row = newImport(summary)
+    setImports((list) => [row, ...list])
+    // When the copy is done the wizard closes and the summary opens as a page.
+    setWizardOpen(false)
+    setViewing(row)
+  }, [])
+
+  // The review and copy steps are a page of their own (a new level in the breadcrumb), not a dialog.
+  if (wizardOpen) {
+    return (
+      <RolloverWizard
+        courseNav={COURSE}
+        onNavigate={onNavigate}
+        commentsFor={commentsFor}
+        adjustDates={adjustDates}
+        onCancel={() => {
+          // Abandoning the session also drops a saved copy it was started from.
+          setWizardOpen(false)
+          setResume(false)
+          setDraft(null)
+        }}
+        onDone={(summary) => {
+          setDraft(null)
+          setResume(false)
+          handleDone(summary)
+        }}
+        draft={resume ? draft : null}
+        onSaveLater={(d) => {
+          setDraft(d)
+          setResume(false)
+          setWizardOpen(false)
+        }}
+      />
+    )
+  }
+
+  // The summary of an earlier copy is a page of its own too, like the summary step of the wizard.
+  if (viewing) {
+    return (
+      <DesktopWrapper
+        pageTitle="Summary"
+        breadcrumb={['Courses', COURSE.name, 'Import Content']}
+        onBreadcrumb={(crumb) => crumb === 'Import Content' && setViewing(null)}
+        activeNav="Courses"
+        course={COURSE}
+        onNavigate={onNavigate}
+        description={`What came over from ${viewing.source} on ${viewing.summary?.when ?? viewing.date}.`}
+        fullWidth
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {viewing.summary && (
+            <SummaryView
+              summary={viewing.summary}
+              published={viewing.published}
+              undone={viewing.status === 'Undone'}
+              onUndo={() => undo(viewing.id)}
+            />
+          )}
+          <div>
+            <Button color="primary" onClick={() => setViewing(null)}>Done</Button>
+          </div>
+        </div>
+      </DesktopWrapper>
+    )
   }
 
   return (
@@ -111,6 +146,7 @@ export default function CourseRollover() {
       // The wrapper draws the course menu: in the Courses sub navigation (Light and Dark) or as a
       // column beside the content (Legacy).
       course={COURSE}
+      onNavigate={onNavigate}
       description={DESCRIPTION}
       fullWidth
     >
@@ -119,12 +155,9 @@ export default function CourseRollover() {
           <Flex direction="column" gap="gap.sections">
             <Flex direction="column" gap="gap.inputs.vertical">
               {/* Light and Dark show the description in the wrapper header. Legacy has no such line. */}
-              {themeKey === 'legacy' && <Text as="p">{DESCRIPTION}</Text>}
-
-              <FigmaAlert variant="warning" type="floating">
-                Previously imported content from the same course will be replaced. Manually added
-                content will remain.
-              </FigmaAlert>
+              <LegacyOnly>
+                <Text as="p">{DESCRIPTION}</Text>
+              </LegacyOnly>
 
               <SimpleSelect
                 renderLabel="Select Content Type"
@@ -136,83 +169,20 @@ export default function CourseRollover() {
                 ))}
               </SimpleSelect>
 
-              <SimpleSelect
-                renderLabel="Search for a course"
-                placeholder="Search..."
-                renderBeforeInput={<IconSearchLine />}
-                value={course}
-                onChange={(_e, { value }) => setCourse(String(value))}
-              >
-                {COURSES.map((c) => (
-                  <SimpleSelect.Option key={c} id={c} value={c}>{c}</SimpleSelect.Option>
-                ))}
-              </SimpleSelect>
-              <Checkbox
-                label="Include completed courses"
-                checked={includeCompleted}
-                onChange={() => setIncludeCompleted((v) => !v)}
-              />
-
-              <RadioInputGroup
-                name="content"
-                description="Content"
-                isRequired
-                value={content}
-                onChange={(_e, value) => setContent(value)}
-              >
-                <RadioInput
-                  value="all"
-                  label={
-                    <div>
-                      <Text>All content</Text>
-                      <Text as="p" variant="contentSmall">
-                        The following content types will be imported: Course Settings, Syllabus
-                        Body, Modules, Assignments, Quizzes, Question Banks, Discussion Topics,
-                        Pages, Announcements, Rubrics, Files, and Calendar Events.
-                      </Text>
-                      <Text as="p" variant="contentSmall">
-                        Feature Options aren't imported and must be enabled manually in the new
-                        course's Settings.
-                      </Text>
-                    </div>
-                  }
-                />
-                <RadioInput value="specific" label="Select specific content" />
-              </RadioInputGroup>
-
-              <Heading level="h3" variant="label">Options</Heading>
-              <Checkbox
-                label="Adjust events and due dates"
-                checked={adjustDates}
-                onChange={() => setAdjustDates((v) => !v)}
-              />
-              {adjustDates && (
-                <>
-                  <RadioInputGroup
-                    name="adjustment"
-                    description="Date adjustments"
-                    value={adjustment}
-                    onChange={(_e, value) => setAdjustment(value)}
-                  >
-                    <RadioInput value="shift" label="Shift dates" />
-                    <RadioInput value="remove" label="Remove dates" />
-                  </RadioInputGroup>
-                  {adjustment === 'shift' && (
-                    <>
-                      <DateChange label="Beginning date:" />
-                      <DateChange label="Ending date:" />
-                      <div>
-                        <Button renderIcon={<IconAddLine />}>Substitution</Button>
-                      </div>
-                    </>
-                  )}
-                </>
+              {isCourseCopy && draft && (
+                <FigmaAlert variant="info" type="inline">
+                  You saved a copy {draft.course ? `from ${draft.course} ` : ''}on step {draft.step + 1} of 5. Nothing has been copied yet.
+                </FigmaAlert>
               )}
 
-              <Flex gap="gap.buttons">
-                <Button onClick={clearAll}>Clear</Button>
-                <Button color="primary" renderIcon={<IconAddLine />}>Add to Import Queue</Button>
-              </Flex>
+              {isCourseCopy && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <Button color="primary" onClick={() => { setResume(draft !== null); setWizardOpen(true) }}>
+                    {draft ? 'Continue copy' : 'Course copy wizard'}
+                  </Button>
+                  {draft && <Button onClick={() => setDraft(null)}>Discard saved copy</Button>}
+                </div>
+              )}
             </Flex>
 
             <View as="section" aria-labelledby="content-imports" borderWidth="small 0 0 0" padding="gap.inputs.vertical 0 0 0">
@@ -231,14 +201,26 @@ export default function CourseRollover() {
                     </Table.Row>
                   </Table.Head>
                   <Table.Body themeOverride={noFill}>
-                    {IMPORTS.map((row) => (
-                      <Table.Row themeOverride={noFill} key={row.source}>
+                    {imports.map((row) => (
+                      <Table.Row themeOverride={noFill} key={row.id}>
                         <Table.Cell themeOverride={noFill}>{row.type}</Table.Cell>
-                        <Table.Cell themeOverride={noFill}><Link href="#">{row.source}</Link></Table.Cell>
+                        <Table.Cell themeOverride={noFill}>
+                          <Link href="#" onClick={(e: { preventDefault: () => void }) => e.preventDefault()}>{row.source}</Link>
+                        </Table.Cell>
                         <Table.Cell themeOverride={noFill}>{row.date}</Table.Cell>
-                        <Table.Cell themeOverride={noFill}><Pill color="success">{row.status}</Pill></Table.Cell>
+                        <Table.Cell themeOverride={noFill}>
+                          <StatusPill color={row.status === 'Completed' ? 'success' : row.status === 'Failed' ? 'error' : 'neutral'}>{row.status}</StatusPill>
+                        </Table.Cell>
                         <Table.Cell themeOverride={noFill} />
-                        <Table.Cell themeOverride={noFill} />
+                        <Table.Cell themeOverride={noFill}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
+                            {row.summary && (
+                              <Link href="#" onClick={(e: { preventDefault: () => void }) => { e.preventDefault(); setViewing(row) }}>
+                                View summary
+                              </Link>
+                            )}
+                          </div>
+                        </Table.Cell>
                       </Table.Row>
                     ))}
                   </Table.Body>
@@ -248,6 +230,12 @@ export default function CourseRollover() {
           </Flex>
         </View>
       </Flex>
+
     </DesktopWrapper>
   )
+}
+
+// Content that only shows in the Legacy theme (it has no description line in its header).
+function LegacyOnly({ children }: { children: ReactNode }) {
+  return useAppThemeKey() === 'legacy' ? <>{children}</> : null
 }

@@ -40,8 +40,11 @@ const PANEL_LABEL: Record<PanelKey, string> = {
 export default function ModernWrapper({
   pageTitle,
   breadcrumb = [],
+  onBreadcrumb,
   activeNav = 'Dashboard',
   course,
+  onNavigate,
+  headerActions,
   fullWidth = false,
   description,
   headerSlot,
@@ -94,7 +97,7 @@ export default function ModernWrapper({
       >
         Skip to main content
       </a>
-      <GlobalNav activeNav={activeNav} course={course} />
+      <GlobalNav activeNav={activeNav} course={course} onNavigate={onNavigate} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         {/* Container: 32px padding around the main container */}
@@ -128,7 +131,14 @@ export default function ModernWrapper({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <Breadcrumb label="You are here:">
                         {breadcrumb.map((crumb) => (
-                          <Breadcrumb.Link key={crumb} href="#">
+                          <Breadcrumb.Link
+                    key={crumb}
+                    href="#"
+                    onClick={(e: { preventDefault: () => void }) => {
+                      e.preventDefault()
+                      onBreadcrumb?.(crumb)
+                    }}
+                  >
                             {crumb}
                           </Breadcrumb.Link>
                         ))}
@@ -137,6 +147,7 @@ export default function ModernWrapper({
                     </div>
                     {/* Global actions: AI agent and notifications open a utility panel */}
                     <div style={{ display: 'flex', gap: t.gapButtons }}>
+                      {headerActions}
                       <IconButton
                         color="ai-primary"
                         screenReaderLabel={PANEL_LABEL.aiAgent}

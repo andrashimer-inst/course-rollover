@@ -70,7 +70,7 @@ type SubNav = 'course' | 'courses' | 'my-courses'
 export type CourseNavItem = { label: string; unpublished?: boolean; current?: boolean }
 // The navigation of the course the user is in (Home, Announcements, ...). In Light and Dark it
 // lives in the Courses sub navigation. In Legacy the page shows it itself, as in Canvas today.
-export type CourseNav = { name: string; items: CourseNavItem[] }
+export type CourseNav = { name: string; items: CourseNavItem[]; onSelect?: (label: string) => void }
 
 
 export type GlobalNavProps = {
@@ -206,7 +206,8 @@ function ModernNav({
   activeNav = 'Dashboard',
   institutionName = 'Instructure',
   userName = 'User Name',
-  userRole = 'student',
+  userRole = 'educator',
+  onNavigate,
 }: GlobalNavProps) {
   const [collapsed, setCollapsed] = useState(false)
   // Which sub navigation is open (null = closed) and which course the user went to.
@@ -286,6 +287,7 @@ function ModernNav({
                   type="button"
                   className="gnav-item"
                   aria-label={`Account, ${userName}`}
+                  onClick={() => onNavigate?.('Account')}
                   style={{
                     boxSizing: 'border-box',
                     width: '2.75rem',
@@ -304,14 +306,24 @@ function ModernNav({
                 </button>
               </Tooltip>
             ) : (
-              <div
+              <button
+                type="button"
+                className="gnav-item"
+                aria-label={`Account, ${userName}`}
+                onClick={() => onNavigate?.('Account')}
                 style={{
                   ...row,
                   boxSizing: 'border-box',
+                  width: '100%',
                   height: '3rem',
                   padding: `0.375rem ${t.space.sm}`,
                   border: `${t.borderWidth} solid ${nav.borderColor}`,
                   borderRadius: t.radiusMd,
+                  background: 'transparent',
+                  color: nav.textColor,
+                  fontFamily: t.fontFamily,
+                  textAlign: 'start',
+                  cursor: 'pointer',
                 }}
               >
                 <Avatar name={userName} size="x-small" />
@@ -319,7 +331,7 @@ function ModernNav({
                   <Text variant="contentSmall">{userName}</Text>
                   <Text variant="legend">{userRole}</Text>
                 </div>
-              </div>
+              </button>
             )}
           </div>
 
@@ -505,6 +517,7 @@ function ModernNav({
                             <Drilldown.Option
                               key={item.label}
                               id={item.label}
+                              onOptionClick={() => course.onSelect?.(item.label)}
                               renderAfterLabel={
                                 <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                   {item.unpublished && (
