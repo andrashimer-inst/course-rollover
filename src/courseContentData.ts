@@ -1,4 +1,4 @@
-// Sample content of the course being copied, for the wizard's "What comes over" step. Everything here is made up.
+// Sample content of the course being copied, for the wizard's "Select content" step. Everything here is made up.
 
 export type TypeId =
   | 'settings' | 'syllabus' | 'modules' | 'assignments' | 'quizzes' | 'banks'

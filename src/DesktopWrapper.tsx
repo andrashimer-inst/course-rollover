@@ -37,6 +37,7 @@ export type DesktopWrapperProps = {
   titleAction?: ReactNode // a button level with the page title, at the end of its row (all themes)
   tabs?: ReactNode // optional page tabs (Tabs)
   headerActions?: ReactNode // extra icon buttons in the header, next to AI agent, notifications and expand
+  sidePanel?: { open: boolean; title: string; description: string; onClose: () => void; content: ReactNode } // a panel the page opens itself, in the utility panel slot (Light and Dark)
   showFilters?: boolean // search, order by and the button that opens the Filters panel
   contentTabList?: ContentTabListConfig // optional in-page navigation, left of the content
   // Legacy only (the Canvas shell). Light and Dark ignore these.

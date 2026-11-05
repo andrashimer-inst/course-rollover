@@ -16,7 +16,7 @@ import {
 import { CONTENT_TYPES, MODULE_ENTRIES } from './courseContentData'
 import type { ContentType, TypeId } from './courseContentData'
 
-// Shared by the "What comes over" step and the loader.
+// Shared by the "Select content" step and the loader.
 
 export type Scope = 'whole' | 'part'
 // Part of it: replace the current course, or merge into it.
@@ -41,8 +41,8 @@ export const TYPE_ICON: Record<TypeId, ReactNode> = {
 export const keys = (type: ContentType) => (type.items.length ? type.items.map((i) => i.id) : [type.id])
 export const countPicked = (type: ContentType, picked: Picked) => keys(type).filter((k) => picked[k]).length
 
-// The types that come over, in list order.
-// A learning object that sits in a picked module comes over with it, so it counts as picked and can't be unticked.
+// The types that are copied, in list order.
+// A learning object that sits in a picked module is copied with it, so it counts as picked and can't be unticked.
 // Returns the modules that pull each such item in, by item id.
 export const pulledInBy = (picked: Picked): Record<string, string[]> => {
   const by: Record<string, string[]> = {}

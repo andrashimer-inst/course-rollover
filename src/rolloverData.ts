@@ -1,6 +1,6 @@
 // Sample data for the copy wizard. Everything here is made up (names, dates, links).
 // It follows the customer discovery priorities: review before the copy (educator comments),
-// a date check with a preview, a link check, and a report of what came over.
+// a date check with a preview, a link check, and a report of what was copied.
 
 export type Decision = 'copy' | 'fix-later' | 'leave-out'
 
@@ -21,7 +21,7 @@ export type EducatorComment = {
 }
 
 const CODES: Record<string, string> = {
-  'Portfolio Test': 'PT',
+  'Design Portfolio': 'DES 310',
   'Biology 101': 'BIO 101',
   'Intro to Design': 'DES 110',
   'World History': 'HIS 120',
@@ -165,7 +165,7 @@ export const BROKEN_LINKS: BrokenLink[] = [
   { id: 'l6', label: 'Data set (CSV)', where: 'Project brief', problem: 'File was deleted', kind: 'missing' },
 ]
 
-// ---- What came over ------------------------------------------------------------------------------------
+// ---- What was copied ------------------------------------------------------------------------------------
 export const COPIED_COUNTS: { type: string; count: number }[] = [
   { type: 'Modules', count: 8 },
   { type: 'Assignments', count: 14 },
@@ -188,7 +188,7 @@ export const AREA_TO_TYPE: Record<string, string> = {
   Discussions: 'Discussions',
 }
 
-// Items the copy tried and could not finish (sample). They are not in the "came over" counts.
+// Items the copy tried and could not finish (sample). They are not in the "copied" counts.
 export const FAILED_ITEMS: { item: string; type: string; reason: string; fix: string }[] = [
   { item: 'Quiz 4 question bank', type: 'Quizzes', reason: 'The copy timed out after 14 of 60 questions.', fix: 'Copy the quiz again on its own.' },
   { item: 'Week 6 lecture recording', type: 'Files', reason: 'The file is 1.2 GB, which is over the 500 MB limit.', fix: 'Upload a smaller version.' },

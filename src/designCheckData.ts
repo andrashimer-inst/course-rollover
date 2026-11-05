@@ -169,7 +169,7 @@ export const DESIGN_RULES: DesignRule[] = [
       {
         id: 'r10',
         kind: 'assignment',
-        title: 'PT Project proposal',
+        title: 'DES 310 Project proposal',
         reason: 'The description gives a length but not a file format or a submission type.',
       },
     ],
@@ -253,10 +253,10 @@ export const DESIGN_RULES: DesignRule[] = [
     title: 'Assignment specifies deliverables.',
     why: 'Well-defined assignment descriptions make it easier for students to understand what they are expected to submit.',
     resources: [
-      { id: 'p1', kind: 'assignment', title: 'PT Assignment 1: Reading response' },
-      { id: 'p2', kind: 'assignment', title: 'PT Project proposal' },
-      { id: 'p3', kind: 'assignment', title: 'PT Assignment 3: Reflection' },
-      { id: 'p4', kind: 'assignment', title: 'PT Quiz 2' },
+      { id: 'p1', kind: 'assignment', title: 'DES 310 Assignment 1: Reading response' },
+      { id: 'p2', kind: 'assignment', title: 'DES 310 Project proposal' },
+      { id: 'p3', kind: 'assignment', title: 'DES 310 Assignment 3: Reflection' },
+      { id: 'p4', kind: 'assignment', title: 'DES 310 Quiz 2' },
       { id: 'p16', kind: 'assignment', title: 'Week 3 discussion' },
     ],
   },

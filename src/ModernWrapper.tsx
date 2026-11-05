@@ -16,7 +16,7 @@ import {
 } from '@instructure/ui/v11_7'
 import GlobalNav from './GlobalNav'
 import ContentTabList from './ContentTabList'
-import { AiAgentPanel, FiltersPanel, NotificationsPanel } from './UtilityPanels'
+import { AiAgentPanel, CustomPanel, FiltersPanel, NotificationsPanel } from './UtilityPanels'
 import { useSurfaceTokens } from './appTheme'
 import type { DesktopWrapperProps } from './DesktopWrapper'
 
@@ -56,10 +56,14 @@ export default function ModernWrapper({
   trailingContent,
   trailingLabel = 'Details',
   filterContent,
+  sidePanel,
   children,
 }: DesktopWrapperProps) {
   const t = useSurfaceTokens()
-  const [panel, setPanel] = useState<PanelKey | null>(null)
+  const [ownPanel, setPanel] = useState<PanelKey | null>(null)
+  // A panel the page opens (like a to-do list) takes the slot of the built-in panels while it is open.
+  const sideOpen = !!sidePanel?.open
+  const panel: PanelKey | 'side' | null = sideOpen ? 'side' : ownPanel
   // The "expand" button in the header lets the user switch between the readable column and full width.
   // A change of the page's `fullWidth` prop starts over from the prop.
   const [widthChoice, setWidthChoice] = useState<{ base: boolean; value: boolean } | null>(null)
@@ -70,6 +74,7 @@ export default function ModernWrapper({
   const panelEl = useRef<HTMLElement | null>(null)
   const toggle = (key: PanelKey, el: HTMLElement | null) => {
     trigger.current = el
+    if (sideOpen) sidePanel?.onClose()
     setPanel((p) => (p === key ? null : key))
   }
   const opener = (key: PanelKey) => (e: { currentTarget: object }) => toggle(key, e.currentTarget as HTMLElement)
@@ -258,7 +263,7 @@ export default function ModernWrapper({
           <aside
             ref={panelEl}
             tabIndex={-1}
-            aria-label={PANEL_LABEL[panel]}
+            aria-label={panel === 'side' ? sidePanel!.title : PANEL_LABEL[panel]}
             style={{
               width: '26.25rem',
               maxWidth: '100vw',
@@ -271,6 +276,11 @@ export default function ModernWrapper({
               outline: 'none',
             }}
           >
+            {panel === 'side' && (
+              <CustomPanel title={sidePanel!.title} description={sidePanel!.description} onClose={sidePanel!.onClose}>
+                {sidePanel!.content}
+              </CustomPanel>
+            )}
             {panel === 'aiAgent' && <AiAgentPanel onClose={close} />}
             {panel === 'notifications' && <NotificationsPanel onClose={close} />}
             {panel === 'filtering' && <FiltersPanel onClose={close}>{filterContent}</FiltersPanel>}

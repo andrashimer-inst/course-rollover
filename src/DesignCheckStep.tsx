@@ -501,7 +501,7 @@ export default function DesignCheckStep({
 
       {!analyzing && !state.analyzed && (
         <FigmaAlert variant="info" type="inline">
-          Choose Analyze Course to check Portfolio Test against the course design rules. You can skip this step. Nothing in
+          Choose Analyze Course to check Design Portfolio against the course design rules. You can skip this step. Nothing in
           the copy changes.
         </FigmaAlert>
       )}

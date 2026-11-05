@@ -4,7 +4,7 @@ import { TYPE_ICON } from './contentHelpers'
 import type { ContentType } from './courseContentData'
 import { useSurfaceTokens } from './appTheme'
 
-// Shown after "What comes over": the course is read one learning object type at a time. Each tile shows its icon
+// Shown after "Select content": the course is read one learning object type at a time. Each tile shows its icon
 // and title, a spinner while it loads and a check when it is done. When the last one is done, `onDone` runs.
 
 const STEP_MS = 650

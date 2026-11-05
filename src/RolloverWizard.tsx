@@ -18,7 +18,7 @@ import SelectCourseStep from "./SelectCourseStep";
 import FixDatesStep from "./FixDatesStep";
 import ReviewAndCopyStep from "./ReviewAndCopyStep";
 import { buildHistory } from "./copyHistory";
-import { INITIAL_OPENING, OPENING_TIME, buildTodo, readiness } from "./reviewCopyData";
+import { INITIAL_OPENING, buildTodo, openingLabel, readiness } from "./reviewCopyData";
 import type { Opening } from "./reviewCopyData";
 import { DATE_ITEMS, INITIAL_DATES, dateCounts } from "./fixDatesData";
 import type { FixDatesState } from "./fixDatesData";
@@ -26,7 +26,8 @@ import LearningObjectReview from "./LearningObjectReview";
 import { buildRows, choiceOf, hiddenModules } from "./reviewData";
 import type { Choice, DupeChoice } from "./reviewData";
 import type { CourseNav } from "./GlobalNav";
-import { useSurfaceTokens } from "./appTheme";
+import { useAppThemeKey, useSurfaceTokens } from "./appTheme";
+import TodoTray, { TODO_DESCRIPTION, TodoList, todoTitle } from "./TodoTray";
 import {
   AREA_TO_TYPE,
   COPIED_COUNTS,
@@ -39,7 +40,7 @@ import type { CopySummary, EducatorComment } from "./rolloverData";
 //   Learning object review  each item checked against the design rules and the team's comments, with a choice per item
 //   Fix dates        deadlines for the new term, with a preview and warnings (priority 7)
 //   Review and copy  readiness check, final preview and a to-do list. The copy starts here
-//   Summary          what came over and what didn't (priority 2)
+//   Summary          what was copied and what wasn't (priority 2)
 // Sample data only.
 
 type StepId = "select" | "content" | "review" | "dates" | "copy";
@@ -51,9 +52,9 @@ const STEP_INFO: Record<StepId, { name: string; hint: string; lead: string }> =
       lead: "Choose the course you want to copy content from. You can only pick one.",
     },
     content: {
-      name: "What comes over",
-      hint: "The whole course or part of it",
-      lead: "Choose if the whole course comes over, or only some learning objects.",
+      name: "Select content",
+      hint: "Whole course or selected items",
+      lead: "Choose whether to copy the whole course or only some learning objects.",
     },
     review: {
       name: "Learning object review",
@@ -220,7 +221,8 @@ export default function RolloverWizard({
     () => (course ? commentsFor(course) : []),
     [commentsFor, course],
   );
-  const [scope, setScope] = useState<Scope | null>(draft?.scope ?? null);
+  // The whole course is selected when the step opens. A choice made later is kept.
+  const [scope, setScope] = useState<Scope | null>(draft?.scope ?? "whole");
   const [picked, setPicked] = useState<Picked>(draft?.picked ?? {});
   const [mode, setMode] = useState<CopyMode>(draft?.mode ?? "merge");
   const [loadingContent, setLoadingContent] = useState(false);
@@ -263,14 +265,14 @@ export default function RolloverWizard({
       text: r.findings[0]?.rule.title ?? r.note?.text ?? "Check it after the copy.",
     });
     const left = rows
-      .filter((r) => choiceOf(r, choices) === "leave")
+      .filter((r) => !r.extra && choiceOf(r, choices) === "leave")
       .map(asItem);
     const fixLater = rows
       .filter((r) => choiceOf(r, choices) === "fix")
       .map(asItem);
     const { shifted, edited } = dateCounts(dates);
     // The broken links are fixed in the learning object review now. The AI fix swaps them in the pages.
-    const linksFixed = rows.some((r) => r.id === "course:links" && choiceOf(r, choices) === "aifix");
+    const linksFixed = rows.some((r) => r.id === "course:links" && ['aifix', 'aicheck'].includes(choiceOf(r, choices) as string));
     const types = new Set(fixLater.map((c) => AREA_TO_TYPE[c.area]));
     const came = COPIED_COUNTS.map((c) => ({
       type: c.type,
@@ -288,21 +290,21 @@ export default function RolloverWizard({
     }));
     const opens =
       opening.mode === "open"
-        ? `It opens on ${OPENING_TIME}.`
-        : "You open it yourself. The course stays unpublished until you publish it.";
+        ? `The course publishes on ${openingLabel(opening)}.`
+        : "The course stays unpublished until you publish it.";
     return {
       course,
       target: courseNav.name,
       when,
       opens,
       stats: {
-        // The learning objects that come over. The course-wide fixes are not items of their own.
-        created: rows.filter((r) => !r.courseWide && choiceOf(r, choices) !== "leave").length,
+        // The learning objects that are copied. The course-wide fixes are not items of their own.
+        created: rows.filter((r) => !r.courseWide && !r.extra && choiceOf(r, choices) !== "leave").length,
         relinked: 3,
         sentToAdmin: 1,
         datesPlaced: dates.mode === "clear" || !adjustDates ? 0 : DATE_ITEMS.length,
       },
-      history: buildHistory({ rows, choices, opens: opening.mode === "open" ? OPENING_TIME : "when you open it" }),
+      history: buildHistory({ rows, choices, opens: opening.mode === "open" ? openingLabel(opening) : "you publish it" }),
       came,
       failed: FAILED_ITEMS.map(({ item, reason, fix }) => ({
         item,
@@ -312,7 +314,7 @@ export default function RolloverWizard({
       notCame: [
         ...left.map((c) => ({
           item: c.item,
-          reason: "you chose to leave it out",
+          reason: "you chose to leave it out of the copy",
           kind: "left-out" as const,
         })),
         {
@@ -407,6 +409,27 @@ export default function RolloverWizard({
     setOpening(prev.opening);
   };
 
+  // The to-do list so far. It follows the choices, so the review step can show it while the choices are made.
+  const todoNow = useMemo(
+    () => buildTodo({ rows, choices, ready: readiness(rows, choices), dates, comments, opening }),
+    [rows, choices, dates, comments, opening],
+  );
+
+  const [todoOpen, setTodoOpen] = useState(false);
+  // Leaving the review with items that have no choice asks first: those items are copied as they are.
+  const [confirmBring, setConfirmBring] = useState(false);
+  // What the window says is fixed when it opens, so the text does not change while it closes.
+  const [bringInfo, setBringInfo] = useState({ count: 0, none: false });
+  const undecided = useMemo(() => rows.filter((r) => choiceOf(r, choices) === undefined), [rows, choices]);
+  const bringAsIs = () => {
+    const next = { ...choices };
+    for (const r of undecided) next[r.id] = "bring";
+    setChoices(next);
+    setConfirmBring(false);
+    go(step + 1);
+  };
+  const legacy = useAppThemeKey() === "legacy";
+
   const id = steps[step];
   // Nothing to lose before anything is chosen, so it only asks once the copy has been started.
   // Anything that leaves the wizard asks first: Cancel, the breadcrumb, the global nav and the course menu.
@@ -462,10 +485,10 @@ export default function RolloverWizard({
       course={{ ...courseNav, onSelect: (label) => leave(() => courseNav.onSelect?.(label)) }}
       onNavigate={(label) => leave(() => onNavigate?.(label))}
       onOpenCourse={() => leave()}
-      description="Review what comes with the copy before it runs."
-      titleAction={
+      // The page buttons sit in the wrapper's actions row, under the page title.
+      actions={
         !loadingContent && !copying ? (
-          <div style={{ display: "flex", gap: t.space.md, alignItems: "center" }}>
+          <>
             <Button onClick={undo} interaction={history.length ? "enabled" : "disabled"}>
               Undo
             </Button>
@@ -476,11 +499,18 @@ export default function RolloverWizard({
             >
               Save and continue later
             </Button>
-          </div>
+          </>
         ) : undefined
+      }
+      // The to-do list opens beside the content (Light and Dark) and only on the review step.
+      sidePanel={
+        (id === "review" || id === "dates" || id === "copy") && !legacy
+          ? { open: todoOpen, title: todoTitle(todoNow), description: TODO_DESCRIPTION, onClose: () => setTodoOpen(false), content: <TodoList todo={todoNow} /> }
+          : undefined
       }
       fullWidth
     >
+      {(id === "review" || id === "dates" || id === "copy") && legacy && <TodoTray open={todoOpen} todo={todoNow} onClose={() => setTodoOpen(false)} />}
       <div
         style={{ display: "flex", flexDirection: "column", gap: t.space.xl }}
       >
@@ -540,9 +570,13 @@ export default function RolloverWizard({
                 mode={mode}
                 picked={picked}
                 dupes={dupes}
+                todo={todoNow}
+                onToggleTodo={() => setTodoOpen((o) => !o)}
               />
             )}
-            {id === "dates" && <FixDatesStep state={dates} setState={setDates} />}
+            {id === "dates" && (
+              <FixDatesStep state={dates} setState={setDates} todoCount={todoNow.length} onToggleTodo={() => setTodoOpen((o) => !o)} />
+            )}
             {id === "copy" && (
               <ReviewAndCopyStep
                 rows={rows}
@@ -556,6 +590,8 @@ export default function RolloverWizard({
                 setReadyRan={setReadyRan}
                 opening={opening}
                 setOpening={setOpening}
+                todoCount={todoNow.length}
+                onToggleTodo={() => setTodoOpen((o) => !o)}
               />
             )}
           </div>
@@ -599,7 +635,11 @@ export default function RolloverWizard({
                 <Button
                   color="primary"
                   onClick={() =>
-                    id === "content" ? setLoadingContent(true) : go(step + 1)
+                    id === "content"
+                      ? setLoadingContent(true)
+                      : id === "review" && undecided.length > 0
+                        ? (setBringInfo({ count: undecided.length, none: Object.keys(choices).length === 0 }), setConfirmBring(true))
+                        : go(step + 1)
                   }
                   interaction={
                     loadingContent ||
@@ -616,6 +656,25 @@ export default function RolloverWizard({
           </div>
         </div>
       </div>
+      <Modal open={confirmBring} onDismiss={() => setConfirmBring(false)} size="small" label="Keep everything" shouldCloseOnDocumentClick={false}>
+        <Modal.Header>
+          <CloseButton placement="end" offset="small" onClick={() => setConfirmBring(false)} screenReaderLabel="Close" />
+          <Heading level="h2">Keep everything?</Heading>
+        </Modal.Header>
+        <Modal.Body>
+          <Text as="p">
+            {bringInfo.none
+              ? `You haven't chosen anything in the review. If you continue, the ${bringInfo.count} items with no choice are copied as they are, with no fixes and nothing left out.`
+              : `${bringInfo.count} ${bringInfo.count === 1 ? "item has" : "items have"} no choice yet. If you continue, ${bringInfo.count === 1 ? "it comes" : "they come"} over as ${bringInfo.count === 1 ? "it is" : "they are"}, with no fixes. The choices you made stay.`}
+          </Text>
+        </Modal.Body>
+        <Modal.Footer>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <Button onClick={() => setConfirmBring(false)}>Back to the review</Button>
+            <Button color="primary" onClick={bringAsIs}>Keep and continue</Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
       <Modal open={confirmLeave} onDismiss={closeConfirm} size="small" label="Abandon the copy" shouldCloseOnDocumentClick={false}>
         <Modal.Header>
           <CloseButton placement="end" offset="small" onClick={closeConfirm} screenReaderLabel="Close" />
