@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react'
-import { IconSearchLine, RadioInput, ScreenReaderContent, SimpleSelect, Table, Text, TextInput } from '@instructure/ui/v11_7'
+import { IconSearchLine, Pagination, RadioInput, ScreenReaderContent, SimpleSelect, Table, Text, TextInput } from '@instructure/ui/v11_7'
 import { SOURCE_COURSES, TIME_KINDS } from './courseListData'
 import type { SourceCourse } from './courseListData'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
 // Step 1 of the copy wizard: pick the course to copy from. One course can be chosen, so each row has a radio button.
-// The list can be searched and filtered by who taught it and the kind of time shown. Clicking a column title sorts the list.
+// The list shows 20 courses a page. It can be searched and filtered by who taught it and the kind of time shown. Clicking a column title sorts the list.
 
 const noFill = { background: 'transparent' }
 
 type SortKey = 'name' | 'teacher' | 'students' | 'time'
 
+const PAGE_SIZE = 20
+// Only the real courses fill the first page. The pages after it repeat the list as placeholders, to show the paging.
+const DUMMY_PAGES = 12
 const ANY = 'any'
 const TAUGHT_BY = [
   { id: ANY, label: 'Anyone' },
@@ -29,6 +32,7 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
   const [time, setTime] = useState(ANY)
   const [sortBy, setSortBy] = useState<SortKey | null>(null)
   const [ascending, setAscending] = useState(true)
+  const [page, setPage] = useState(1)
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -49,8 +53,17 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
     return ascending ? sorted : sorted.reverse()
   }, [shown, sortBy, ascending])
 
+  const pageCount = rows.length > PAGE_SIZE ? DUMMY_PAGES : 1
+  const total = pageCount > 1 ? pageCount * PAGE_SIZE : rows.length
+  const current = Math.min(page, pageCount)
+  const first = (current - 1) * PAGE_SIZE
+  const pageRows = pageCount === 1
+    ? rows
+    : Array.from({ length: PAGE_SIZE }, (_, i) => rows[(first + i) % rows.length])
+
   const sortProps = (key: SortKey) => ({
     onRequestSort: () => {
+      setPage(1)
       if (sortBy === key) setAscending(!ascending)
       else {
         setSortBy(key)
@@ -79,15 +92,15 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
             placeholder="Course name, code or teacher"
             renderBeforeInput={<IconSearchLine />}
             value={query}
-            onChange={(_e, value) => setQuery(value)}
+            onChange={(_e, value) => { setQuery(value); setPage(1) }}
           />
         </div>
-        {filter('Taught by', taught, setTaught, TAUGHT_BY)}
-        {filter('Time', time, setTime, [{ id: ANY, label: 'Any time' }, ...TIME_KINDS.map((k) => ({ id: k, label: k }))])}
+        {filter('Taught by', taught, (v) => { setTaught(v); setPage(1) }, TAUGHT_BY)}
+        {filter('Time', time, (v) => { setTime(v); setPage(1) }, [{ id: ANY, label: 'Any time' }, ...TIME_KINDS.map((k) => ({ id: k, label: k }))])}
       </div>
 
       <Text color="secondary" aria-live="polite">
-        {shown.length} of {SOURCE_COURSES.length} courses
+        {shown.length === 0 ? '0' : `${first + 1} to ${first + pageRows.length}`} of {total} courses
       </Text>
 
       {shown.length === 0 ? (
@@ -119,10 +132,6 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
           `}</style>
           <div
             className="course-scroll"
-            tabIndex={0}
-            role="region"
-            aria-label="Courses, scrollable"
-            style={{ maxHeight: '24rem', overflowY: 'auto' }}
           >
           <Table caption={() => 'Courses you can copy from'} themeOverride={noFill}>
             <Table.Head themeOverride={noFill}>
@@ -135,10 +144,10 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
               </Table.Row>
             </Table.Head>
             <Table.Body themeOverride={noFill}>
-              {rows.map((c) => (
+              {pageRows.map((c, i) => (
                 <Table.Row
                   themeOverride={noFill}
-                  key={c.name}
+                  key={`${current}-${i}`}
                   data-selected={selected === c.name}
                   onClick={() => onSelect(c.name)}
                 >
@@ -167,6 +176,23 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
             </Table.Body>
           </Table>
           </div>
+          {pageCount > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingBlockStart: t.space.lg }}>
+              <Pagination
+                as="nav"
+                variant="compact"
+                showDisabledButtons
+                siblingCount={3}
+                boundaryCount={1}
+                labelNext="Next page"
+                labelPrev="Previous page"
+                screenReaderLabelPageButton={(c, total) => `Page ${c} of ${total}`}
+                totalPageNumber={pageCount}
+                currentPage={current}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -34,6 +34,7 @@ export type DesktopWrapperProps = {
   description?: ReactNode // short page description under the title
   headerSlot?: ReactNode // custom content in the header, under the title
   actions?: ReactNode // the page's buttons. Light and Dark: a row under the header. Legacy: end of the title row.
+  titleAction?: ReactNode // a button level with the page title, at the end of its row (all themes)
   tabs?: ReactNode // optional page tabs (Tabs)
   headerActions?: ReactNode // extra icon buttons in the header, next to AI agent, notifications and expand
   showFilters?: boolean // search, order by and the button that opens the Filters panel

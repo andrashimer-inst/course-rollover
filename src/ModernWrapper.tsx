@@ -49,6 +49,7 @@ export default function ModernWrapper({
   description,
   headerSlot,
   actions,
+  titleAction,
   tabs,
   showFilters = false,
   contentTabList,
@@ -175,9 +176,12 @@ export default function ModernWrapper({
                     </div>
                   </div>
                   <div style={{ ...column, gap: t.space.xs }}>
-                    <Heading level="h1" variant="titlePageDesktop">
-                      {pageTitle}
-                    </Heading>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md }}>
+                      <Heading level="h1" variant="titlePageDesktop">
+                        {pageTitle}
+                      </Heading>
+                      {titleAction}
+                    </div>
                     {description && (
                       <Text as="div" variant="descriptionPage" color="secondary">
                         {description}

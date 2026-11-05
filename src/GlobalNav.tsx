@@ -366,7 +366,10 @@ function ModernNav({
                   expanded={subNav !== null}
                   onClick={() => {
                     if (hasSub) openSub(subNav ? null : course ? 'course' : 'courses')
-                    else openSub(null)
+                    else {
+                      openSub(null)
+                      onNavigate?.(key)
+                    }
                   }}
                 />
               )

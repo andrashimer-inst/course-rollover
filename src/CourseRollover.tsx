@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
+import { SOURCE_COURSES } from './courseListData'
 import {
   Button,
   Flex,
@@ -40,6 +41,8 @@ const COURSE_NAV = [
   { label: 'BigBlueButton' }, { label: 'Collaborations' }, { label: 'Grade Sync', unpublished: true },
   { label: 'Course Analytics' }, { label: 'Lucid (Whiteboard)' }, { label: 'Settings', current: true },
 ]
+// The signed-in educator, as the global nav shows them.
+const USER_NAME = 'User Name'
 const COURSE = { name: 'Rollover', items: COURSE_NAV }
 const DESCRIPTION = 'Use the Import Content tool to migrate course materials from other sources into this course.'
 
@@ -62,12 +65,13 @@ export default function CourseRollover({
   const [imports, setImports] = useState<ImportRow[]>(() => [...PREVIOUS_IMPORTS])
   const [wizardOpen, setWizardOpen] = useState(false)
   // A copy saved with "Save and continue later". It is picked up again on the step it was left on.
-  const [draft, setDraft] = useState<WizardDraft | null>(null)
+  const [draft, setDraft] = useState<(WizardDraft & { savedAt: Date }) | null>(null)
   const [resume, setResume] = useState(false)
   // The import whose summary is open as a page. A copy is undone from its summary.
   const [viewing, setViewing] = useState<ImportRow | null>(null)
   const undo = (id: string) => setImports((list) => list.map((r) => (r.id === id ? { ...r, status: 'Undone' as const } : r)))
 
+  const saved = draft ? SOURCE_COURSES.find((c) => c.name === draft.course) : undefined
   const isCourseCopy = contentType === CONTENT_TYPES[0]
 
   const commentsFor = useCallback((c: string) => commentsForCopy(c, notes), [notes])
@@ -100,7 +104,7 @@ export default function CourseRollover({
         }}
         draft={resume ? draft : null}
         onSaveLater={(d) => {
-          setDraft(d)
+          setDraft({ ...d, savedAt: new Date() })
           setResume(false)
           setWizardOpen(false)
         }}
@@ -171,7 +175,17 @@ export default function CourseRollover({
 
               {isCourseCopy && draft && (
                 <FigmaAlert variant="info" type="inline">
-                  You saved a copy {draft.course ? `from ${draft.course} ` : ''}on step {draft.step + 1} of 5. Nothing has been copied yet.
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <Text as="div" weight="bold">
+                      {USER_NAME} saved a copy on {draft.savedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {draft.savedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    </Text>
+                    {saved && (
+                      <Text as="div">
+                        Course: {saved.name} · Short code: {saved.code} · SIS ID: {saved.sisId}
+                      </Text>
+                    )}
+                    <Text as="div">On step {draft.step + 1} of 5. Nothing has been copied yet.</Text>
+                  </div>
                 </FigmaAlert>
               )}
 
