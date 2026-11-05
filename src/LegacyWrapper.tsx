@@ -25,6 +25,7 @@ const FOOTER_LINKS = ['Privacy Policy', 'Cookie Notice', 'Acceptable Use Policy'
 
 export default function LegacyWrapper({
   pageTitle,
+  description,
   breadcrumb = [],
   onBreadcrumb,
   activeNav = 'Dashboard',
@@ -121,7 +122,11 @@ export default function LegacyWrapper({
                     borderBottom: course ? undefined : separator,
                   }}
                 >
-                  <Heading level="h1">{pageTitle}</Heading>
+                  {/* The title, then the description 4px under it (Figma header spacing). */}
+                  <div style={{ ...column, gap: t.space.xs, minWidth: 0 }}>
+                    <Heading level="h1" variant="titlePageMobile">{pageTitle}</Heading>
+                    {description && <Text as="div" variant="descriptionPage">{description}</Text>}
+                  </div>
                   {(actions || titleAction) && <div style={{ display: 'flex', alignItems: 'center', gap: t.gapButtons }}>{actions}{titleAction}</div>}
                 </header>
                 <main id="main-content" tabIndex={-1} style={{ marginTop: t.space.xl, outline: 'none' }}>
