@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react'
-import type { ReactNode } from 'react'
 import { SOURCE_COURSES } from './courseListData'
 import {
   Button,
   CloseButton,
   Flex,
+  EyeInstUIIcon,
   Heading,
+  IconButton,
   Link,
   Modal,
+  ScreenReaderContent,
   SimpleSelect,
   Table,
   Text,
@@ -20,7 +22,7 @@ import RolloverWizard from './RolloverWizard'
 import type { WizardDraft } from './RolloverWizard'
 import { SummaryView } from './CopySummaryView'
 import StatusPill from './StatusPill'
-import { useAppThemeKey } from './appTheme'
+import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 import type { CopySummary } from './rolloverData'
 import { PREVIOUS_IMPORTS, UNDO_BLOCKED, newImport } from './sampleImports'
 import type { ImportRow } from './sampleImports'
@@ -64,6 +66,8 @@ export default function CourseRollover({
   // A global nav item was chosen (for example Notebook in the Account menu or tray).
   onNavigate?: (label: string) => void
 }) {
+  const legacy = useAppThemeKey() === 'legacy'
+  const t = useSurfaceTokens()
   const [contentType, setContentType] = useState(CONTENT_TYPES[0])
   const adjustDates = true
   const [imports, setImports] = useState<ImportRow[]>(() => [...PREVIOUS_IMPORTS])
@@ -199,15 +203,9 @@ export default function CourseRollover({
       description={DESCRIPTION}
       fullWidth
     >
-      <Flex alignItems="start" gap="gap.sections">
+      <Flex direction="column" gap="gap.sections">
         <View as="div" maxWidth="47.5rem" display="block">
-          <Flex direction="column" gap="gap.sections">
             <Flex direction="column" gap="gap.inputs.vertical">
-              {/* Light and Dark show the description in the wrapper header. Legacy has no such line. */}
-              <LegacyOnly>
-                <Text as="p">{DESCRIPTION}</Text>
-              </LegacyOnly>
-
               <SimpleSelect
                 renderLabel="Select Content Type"
                 value={contentType}
@@ -243,20 +241,30 @@ export default function CourseRollover({
                 </div>
               )}
             </Flex>
+        </View>
 
-            <View as="section" aria-labelledby="content-imports" borderWidth="small 0 0 0" padding="gap.inputs.vertical 0 0 0">
-              <Flex direction="column" gap="general.spaceSm">
-                <Heading level="h2" id="content-imports">Content imports</Heading>
-                <Text as="p">Content import files cannot be downloaded after 500 days.</Text>
+            <section
+              aria-labelledby="content-imports"
+              style={
+                legacy
+                  ? { borderTop: `${t.borderWidth} solid ${t.borderColor}`, paddingTop: t.space.xl, marginTop: `calc(${t.space.xl} * -1)` }
+                  : { background: t.containerColor, borderRadius: t.radiusCardMd, boxShadow: t.shadowResting, padding: t.space.lg }
+              }
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                  <Text as="div" weight="bold" size="large" id="content-imports">Content imports</Text>
+                  <Text as="div" color="secondary">Content import files cannot be downloaded after 500 days.</Text>
+                </div>
                 <Table caption={() => 'Content imports'} themeOverride={noFill}>
                   <Table.Head themeOverride={noFill}>
                     <Table.Row themeOverride={noFill}>
-                      <Table.ColHeader themeOverride={noFill} id="type">Content Type</Table.ColHeader>
-                      <Table.ColHeader themeOverride={noFill} id="source">Source Link</Table.ColHeader>
-                      <Table.ColHeader themeOverride={noFill} id="date">Date Imported</Table.ColHeader>
-                      <Table.ColHeader themeOverride={noFill} id="status">Status</Table.ColHeader>
-                      <Table.ColHeader themeOverride={noFill} id="progress">Progress</Table.ColHeader>
-                      <Table.ColHeader themeOverride={noFill} id="action">Action</Table.ColHeader>
+                      <Table.ColHeader themeOverride={noFill} id="type" width="20%">Content Type</Table.ColHeader>
+                      <Table.ColHeader themeOverride={noFill} id="source" width="22%">Source Link</Table.ColHeader>
+                      <Table.ColHeader themeOverride={noFill} id="date" width="16%">Date Imported</Table.ColHeader>
+                      <Table.ColHeader themeOverride={noFill} id="status" width="14%">Status</Table.ColHeader>
+                      <Table.ColHeader themeOverride={noFill} id="progress" width="12%">Progress</Table.ColHeader>
+                      <Table.ColHeader themeOverride={noFill} id="action" width="8%" textAlign="end"><ScreenReaderContent>Action</ScreenReaderContent></Table.ColHeader>
                     </Table.Row>
                   </Table.Head>
                   <Table.Body themeOverride={noFill}>
@@ -271,30 +279,21 @@ export default function CourseRollover({
                           <StatusPill color={row.status === 'Completed' ? 'success' : row.status === 'Failed' ? 'error' : 'neutral'}>{row.status}</StatusPill>
                         </Table.Cell>
                         <Table.Cell themeOverride={noFill} />
-                        <Table.Cell themeOverride={noFill}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-                            {row.summary && (
-                              <Link href="#" onClick={(e: { preventDefault: () => void }) => { e.preventDefault(); setViewing(row) }}>
-                                View summary
-                              </Link>
-                            )}
-                          </div>
+                        <Table.Cell themeOverride={noFill} textAlign="end">
+                          {row.summary && (
+                            <IconButton color="secondary" size="small" screenReaderLabel={`View summary of ${row.source}`} onClick={() => setViewing(row)}>
+                              <EyeInstUIIcon />
+                            </IconButton>
+                          )}
                         </Table.Cell>
                       </Table.Row>
                     ))}
                   </Table.Body>
                 </Table>
-              </Flex>
-            </View>
-          </Flex>
-        </View>
+              </div>
+            </section>
       </Flex>
 
     </DesktopWrapper>
   )
-}
-
-// Content that only shows in the Legacy theme (it has no description line in its header).
-function LegacyOnly({ children }: { children: ReactNode }) {
-  return useAppThemeKey() === 'legacy' ? <>{children}</> : null
 }
