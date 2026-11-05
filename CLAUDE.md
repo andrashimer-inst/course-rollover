@@ -31,6 +31,7 @@ steps in plain language and run commands for them where possible.
 - InstUI `View` ignores layout styles such as `flex` and `width`. Use plain `div` boxes for layout.
 - Figma-only "(beta)" components (GlobalNav, Wrapper, ContentTabList, TrailingContentArea,
   UtilityPanel) don't exist in the package. Build them from `SideNavBar`, `Tray`, `Tabs` and so on.
+  SegmentedControl is in Figma but not in the package: use `src/SegmentedControl.tsx` (built from buttons and the theme tokens).
 - **Source of truth.** Design (how it looks, which variants, when to use it) follows the Figma
   components. Buildability follows the installed package, which is the latest code. The site docs
   mostly describe the legacy components, so use them for behavior and examples only. Where Figma

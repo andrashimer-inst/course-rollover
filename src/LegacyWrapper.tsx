@@ -31,6 +31,7 @@ export default function LegacyWrapper({
   course,
   fullWidth = false,
   actions,
+  titleAction,
   barActions,
   trailingContent,
   trailingLabel = 'Details',
@@ -121,7 +122,7 @@ export default function LegacyWrapper({
                   }}
                 >
                   <Heading level="h1">{pageTitle}</Heading>
-                  {actions && <div style={{ display: 'flex', alignItems: 'center', gap: t.gapButtons }}>{actions}</div>}
+                  {(actions || titleAction) && <div style={{ display: 'flex', alignItems: 'center', gap: t.gapButtons }}>{actions}{titleAction}</div>}
                 </header>
                 <main id="main-content" tabIndex={-1} style={{ marginTop: t.space.xl, outline: 'none' }}>
                   {children}

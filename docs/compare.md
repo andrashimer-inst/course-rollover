@@ -137,6 +137,7 @@ only `v2` works in Light and Dark. A component marked "Legacy only" will look wr
 | ScreenReaderContent | Yes, no theme versions | No |
 | SearchPanel | Not in package | No |
 | Select | Yes, new theme (v2) | No |
+| SegmentedControl | Not in the package (built in `src/SegmentedControl.tsx`) | Yes (38283:40156) |
 | Selectable | Yes, no theme versions | No |
 | SideNavBar | Yes, new theme (v2) | No |
 | SimpleSelect | Yes, new theme (v2) | No |
@@ -681,6 +682,12 @@ Short notes, one block per component. Treat prop names here as a guide and confi
 - Figma: none.
 - Docs status: props-only page with no description. It lists `view` (CodeMirror `EditorView`) and `searchConfig` { placeholder, nextResultLabel, prevResultLabel }, and shows an import that the installed package does not export.
 - Use: Don't import it. Turn it on with the `searchConfig` prop on SourceCodeEditor (Cmd/Ctrl+F; it always opens at the bottom of the editor).
+
+### SegmentedControl
+- Package 11.7.8: not in the package. The theme tokens for it exist (`SegmentedControl` in the light, dark and canvas themes), so the custom build reads them.
+- Figma: "instUI segmentedControl" (38283:40156). style text, icon, text + icon; size sm, md, lg; isDisabled. Item height 32, 40, 48 inside a 4px padded bar; item radius 12, bar radius 16; selected item has a small shadow.
+- Use: `src/SegmentedControl.tsx`. Props: `label`, `options` ({ value, label, icon, screenReaderLabel, disabled }), `value`, `onChange`, `size` (default md), `disabled`. It is a radio group: one tab stop, arrow keys, Home and End.
+- Gap: Legacy (canvas) tokens draw it as separate blue buttons with no bar, and have no disabled colors, so Legacy is dimmed when disabled.
 
 ### Select
 - Package 11.7.8: v2 (ui-select; Select, Select.Option, Select.Group; v1 also installed). v2 has `renderBeforeInputElementGap` ('default' | 'even'), which v1 lacks.

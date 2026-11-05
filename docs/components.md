@@ -186,6 +186,12 @@ Every component page shows four themes. Some pages name them light, dark, legacy
 - Best practices: labels are 1 to 4 word nouns naming what's enabled. Don't mix label placements in a group; give related switches a heading. Don't use to navigate or open a modal. Opt-in features default to off. Don't mix sizes. Descriptions are 1 to 2 sentences that add to the label. Error for failed validation with a message.
 - Accessibility: label stands alone. On and off are announced automatically, so don't put the state in the label. Group under a visible heading.
 
+### Segmented Control (38283:40156)
+- Variants: style = text, icon, text + icon. size = sm, md, lg. isDisabled = false, true. One option is selected (dark navy in Light, light in Dark) on a tinted bar.
+- Use when: choosing one of a few options that should all stay visible (a view, a range, a mode), and the choice changes what you see now.
+- Don't use: for many options (SimpleSelect), for switching page content (Tabs), for an on or off setting (Checkbox toggle).
+- Not in the InstUI package. Built in `src/SegmentedControl.tsx` from buttons and the theme's SegmentedControl tokens (see `docs/compare.md`).
+
 ### Table (17819:940)
 - Variants: showSelection. columnAmount = 2 to 8. Cell types = text, slot, rowHeader, checkbox, button. Sort order = base, ascending, descending. Head and row hover states.
 - No guideline text on the page.

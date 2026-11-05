@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   CircleCheckInstUIIcon,
@@ -372,9 +372,66 @@ export default function RolloverWizard({
     return () => clearTimeout(done);
   }, [copying, progress, onDone, summary]);
 
+  // Undo: every change to the choices, and every move to another step, is remembered. Undo takes the last one back.
+  const snap = useMemo<WizardDraft>(
+    () => ({ course, scope, picked, mode, step, reached, choices, dupes, dates, readyRan, opening }),
+    [course, scope, picked, mode, step, reached, choices, dupes, dates, readyRan, opening],
+  );
+  const [history, setHistory] = useState<WizardDraft[]>([]);
+  const lastSnap = useRef(snap);
+  const restoring = useRef(false);
+  useEffect(() => {
+    if (lastSnap.current === snap) return;
+    const before = lastSnap.current;
+    lastSnap.current = snap;
+    if (restoring.current) restoring.current = false;
+    else setHistory((h) => [...h.slice(-99), before]);
+  }, [snap]);
+  const undo = () => {
+    const prev = history[history.length - 1];
+    if (!prev) return;
+    restoring.current = true;
+    setHistory((h) => h.slice(0, -1));
+    // reviewedFor moves with the course, so going back to another course keeps its choices.
+    setReviewedFor(prev.course);
+    setCourse(prev.course);
+    setScope(prev.scope);
+    setPicked(prev.picked);
+    setMode(prev.mode);
+    setStep(prev.step);
+    setReached(prev.reached);
+    setChoices(prev.choices);
+    setDupes(prev.dupes);
+    setDates(prev.dates);
+    setReadyRan(prev.readyRan);
+    setOpening(prev.opening);
+  };
+
   const id = steps[step];
   // Nothing to lose before anything is chosen, so it only asks once the copy has been started.
-  const leave = () => (course || step > 0 ? setConfirmLeave(true) : onCancel());
+  // Anything that leaves the wizard asks first: Cancel, the breadcrumb, the global nav and the course menu.
+  // `then` is what the educator was trying to open. It runs after they confirm.
+  const afterLeave = useRef<(() => void) | undefined>(undefined);
+  const leave = (then?: unknown) => {
+    afterLeave.current = typeof then === "function" ? (then as () => void) : undefined;
+    if (course || step > 0) setConfirmLeave(true);
+    else {
+      onCancel();
+      afterLeave.current?.();
+    }
+  };
+  // Closing the browser tab or reloading also drops the copy, so the browser asks as well.
+  const hasWork = course !== "" || step > 0;
+  useEffect(() => {
+    if (!hasWork) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasWork]);
+  const closeConfirm = () => {
+    afterLeave.current = undefined;
+    setConfirmLeave(false);
+  };
   // The copy runs from the last step.
   const atCopy = id === "copy";
   const go = (i: number) => {
@@ -400,11 +457,28 @@ export default function RolloverWizard({
       pageTitle={course ? `Copy content from ${course}` : "Course copy wizard"}
       breadcrumb={["Courses", courseNav.name, "Import Content"]}
       // "Import Content" goes back to the page the wizard started from.
-      onBreadcrumb={(crumb) => crumb === "Import Content" && leave()}
+      onBreadcrumb={() => leave()}
       activeNav="Courses"
-      course={courseNav}
-      onNavigate={onNavigate}
+      course={{ ...courseNav, onSelect: (label) => leave(() => courseNav.onSelect?.(label)) }}
+      onNavigate={(label) => leave(() => onNavigate?.(label))}
+      onOpenCourse={() => leave()}
       description="Review what comes with the copy before it runs."
+      titleAction={
+        !loadingContent && !copying ? (
+          <div style={{ display: "flex", gap: t.space.md, alignItems: "center" }}>
+            <Button onClick={undo} interaction={history.length ? "enabled" : "disabled"}>
+              Undo
+            </Button>
+            <Button
+              onClick={() =>
+                onSaveLater({ course, scope, picked, mode, step, reached, choices, dupes, dates, readyRan, opening })
+              }
+            >
+              Save and continue later
+            </Button>
+          </div>
+        ) : undefined
+      }
       fullWidth
     >
       <div
@@ -443,26 +517,6 @@ export default function RolloverWizard({
               gap: t.space.xl,
             }}
           >
-            {/* The step title on the left, "Save and continue later" at the right end of the same row. */}
-            <div style={{ display: "flex", gap: t.space.md, alignItems: "flex-start", justifyContent: "space-between" }}>
-              <div style={{ flex: "1 1 0", minWidth: 0 }}>
-                <Heading level="h3" variant="titleSection">
-                  {`Step ${step + 1} of ${steps.length}: `}
-                  {STEP_INFO[id].name}
-                </Heading>
-                <Text as="p" color="secondary">
-                  {STEP_INFO[id].lead}
-                </Text>
-              </div>
-              <Button
-                // Always on the first line of the row, level with the top of the step title.
-                onClick={() =>
-                  onSaveLater({ course, scope, picked, mode, step, reached, choices, dupes, dates, readyRan, opening })
-                }
-              >
-                Save and continue later
-              </Button>
-            </div>
             {id === "select" && (
               <SelectCourseStep selected={course} onSelect={setCourse} />
             )}
@@ -562,9 +616,9 @@ export default function RolloverWizard({
           </div>
         </div>
       </div>
-      <Modal open={confirmLeave} onDismiss={() => setConfirmLeave(false)} size="small" label="Abandon the copy" shouldCloseOnDocumentClick={false}>
+      <Modal open={confirmLeave} onDismiss={closeConfirm} size="small" label="Abandon the copy" shouldCloseOnDocumentClick={false}>
         <Modal.Header>
-          <CloseButton placement="end" offset="small" onClick={() => setConfirmLeave(false)} screenReaderLabel="Close" />
+          <CloseButton placement="end" offset="small" onClick={closeConfirm} screenReaderLabel="Close" />
           <Heading level="h2">Abandon the copy?</Heading>
         </Modal.Header>
         <Modal.Body>
@@ -574,8 +628,8 @@ export default function RolloverWizard({
         </Modal.Body>
         <Modal.Footer>
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <Button onClick={() => setConfirmLeave(false)}>Keep working</Button>
-            <Button color="danger" onClick={() => { setConfirmLeave(false); onCancel(); }}>
+            <Button onClick={closeConfirm}>Keep working</Button>
+            <Button color="danger" onClick={() => { setConfirmLeave(false); onCancel(); afterLeave.current?.(); afterLeave.current = undefined; }}>
               Yes, abandon the copy
             </Button>
           </div>
