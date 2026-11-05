@@ -47,6 +47,7 @@ export function useSurfaceTokens() {
     textColor: semantic.color.text.base as string,
     mutedTextColor: semantic.color.text.muted as string,
     successTextColor: semantic.color.text.success as string,
+    warningTextColor: semantic.color.text.warning as string,
     strokeBase: shared.stroke.baseColor as string,
     aiTopColor: shared.background.aiTopGradientColor as string, // IgniteAI gradient
     aiBottomColor: shared.background.aiBottomGradientColor as string,

@@ -3,12 +3,15 @@ import type { ReactNode } from 'react'
 import { SOURCE_COURSES } from './courseListData'
 import {
   Button,
+  CloseButton,
   Flex,
   Heading,
   Link,
+  Modal,
   SimpleSelect,
   Table,
   Text,
+  Tooltip,
   View,
 } from '@instructure/ui/v11_7'
 import DesktopWrapper from './DesktopWrapper'
@@ -19,7 +22,7 @@ import { SummaryView } from './CopySummaryView'
 import StatusPill from './StatusPill'
 import { useAppThemeKey } from './appTheme'
 import type { CopySummary } from './rolloverData'
-import { PREVIOUS_IMPORTS, newImport } from './sampleImports'
+import { PREVIOUS_IMPORTS, UNDO_BLOCKED, newImport } from './sampleImports'
 import type { ImportRow } from './sampleImports'
 import { commentsForCopy } from './notebookData'
 import type { Note } from './notebookData'
@@ -27,7 +30,7 @@ import type { Note } from './notebookData'
 // Course Rollover: "Import Content" page, built on the template. Figma decides the design, the package
 // decides what exists, new-theme (v2) components only, spacing from docs/spacing.md.
 // Changes from the customer discovery (top 10 priorities):
-//   starting a copy opens a review wizard first (comments, dates, links), then a summary of what came over
+//   starting a copy opens a review wizard first (comments, dates, links), then a summary of what was copied
 //   copying over an existing copy asks for confirmation first
 // Sample data only.
 
@@ -43,7 +46,8 @@ const COURSE_NAV = [
 ]
 // The signed-in educator, as the global nav shows them.
 const USER_NAME = 'User Name'
-const COURSE = { name: 'Rollover', items: COURSE_NAV }
+// The course the content is copied into.
+const COURSE = { name: 'Cell Biology', items: COURSE_NAV }
 const DESCRIPTION = 'Use the Import Content tool to migrate course materials from other sources into this course.'
 
 const CONTENT_TYPES = ['Copy a Canvas course or learning objects', 'Canvas Course Export Package', 'Zip file', 'QTI .zip file']
@@ -69,6 +73,8 @@ export default function CourseRollover({
   const [resume, setResume] = useState(false)
   // The import whose summary is open as a page. A copy is undone from its summary.
   const [viewing, setViewing] = useState<ImportRow | null>(null)
+  // The window that asks before the whole copy is undone.
+  const [confirmUndo, setConfirmUndo] = useState(false)
   const undo = (id: string) => setImports((list) => list.map((r) => (r.id === id ? { ...r, status: 'Undone' as const } : r)))
 
   const saved = draft ? SOURCE_COURSES.find((c) => c.name === draft.course) : undefined
@@ -114,30 +120,69 @@ export default function CourseRollover({
 
   // The summary of an earlier copy is a page of its own too, like the summary step of the wizard.
   if (viewing) {
+    // The page title says how the copy went. An undone copy is read from the list, because the row kept here is the old one.
+    const now = imports.find((r) => r.id === viewing.id) ?? viewing
+    const wasUndone = now.status === 'Undone'
+    const s = viewing.summary
     return (
       <DesktopWrapper
-        pageTitle="Summary"
+        pageTitle={s ? (wasUndone ? `${s.target} was set back to empty` : `${s.target} Spring 2027 is set up`) : 'Summary'}
         breadcrumb={['Courses', COURSE.name, 'Import Content']}
         onBreadcrumb={(crumb) => crumb === 'Import Content' && setViewing(null)}
         activeNav="Courses"
         course={COURSE}
         onNavigate={onNavigate}
-        description={`What came over from ${viewing.source} on ${viewing.summary?.when ?? viewing.date}.`}
+        // The two actions sit under the page title, like the buttons of the wizard steps.
+        actions={
+          s ? (
+            <>
+              {!wasUndone && <Button color="primary">Open course</Button>}
+              <Tooltip
+                renderTip={
+                  viewing.published
+                    ? UNDO_BLOCKED
+                    : `Removes everything this copy created. Your ${s.target} Spring 2027 course goes back to empty. Your choices are kept.`
+                }
+                placement="bottom start"
+              >
+                {/* A disabled button gets no hover, so the tooltip sits on a wrapper that can also take focus. */}
+                <span tabIndex={0} style={{ display: 'inline-flex' }}>
+                  <Button color="danger" interaction={wasUndone || viewing.published ? 'disabled' : 'enabled'} onClick={() => setConfirmUndo(true)}>
+                    Undo the whole copy
+                  </Button>
+                </span>
+              </Tooltip>
+            </>
+          ) : undefined
+        }
+        description={s ? (wasUndone ? 'The copy was undone. Your choices are kept.' : s.opens) : `What was copied from ${viewing.source} on ${viewing.date}.`}
         fullWidth
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {viewing.summary && (
-            <SummaryView
-              summary={viewing.summary}
-              published={viewing.published}
-              undone={viewing.status === 'Undone'}
-              onUndo={() => undo(viewing.id)}
-            />
+            <SummaryView summary={viewing.summary} undone={wasUndone} />
           )}
           <div>
             <Button color="primary" onClick={() => setViewing(null)}>Done</Button>
           </div>
         </div>
+        <Modal open={confirmUndo} onDismiss={() => setConfirmUndo(false)} size="small" label="Undo the whole copy" shouldCloseOnDocumentClick={false}>
+          <Modal.Header>
+            <CloseButton placement="end" offset="small" onClick={() => setConfirmUndo(false)} screenReaderLabel="Close" />
+            <Heading level="h2">Undo the whole copy?</Heading>
+          </Modal.Header>
+          <Modal.Body>
+            <Text as="p">
+              This removes everything the copy created in {s?.target}. The course goes back to empty. Your choices are kept, so you can copy again.
+            </Text>
+          </Modal.Body>
+          <Modal.Footer>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <Button onClick={() => setConfirmUndo(false)}>Cancel</Button>
+              <Button color="danger" onClick={() => { setConfirmUndo(false); undo(viewing.id) }}>Yes, undo it</Button>
+            </div>
+          </Modal.Footer>
+        </Modal>
       </DesktopWrapper>
     )
   }
@@ -145,7 +190,7 @@ export default function CourseRollover({
   return (
     <DesktopWrapper
       pageTitle="Import Content"
-      breadcrumb={['Courses', 'Rollover']}
+      breadcrumb={['Courses', COURSE.name]}
       activeNav="Courses"
       // The wrapper draws the course menu: in the Courses sub navigation (Light and Dark) or as a
       // column beside the content (Legacy).

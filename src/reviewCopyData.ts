@@ -2,7 +2,7 @@ import { DESIGN_RULES, DIMENSIONS } from './designCheckData'
 import type { DesignRule, Dimension } from './designCheckData'
 import { EXTRA_RULES, choiceOf } from './reviewData'
 import type { Choice, ReviewRow } from './reviewData'
-import { DATE_ITEMS, rowInfo, fmtShort } from './fixDatesData'
+import { DATE_ITEMS, NO_DATE_ITEMS, rowInfo, fmtShort } from './fixDatesData'
 import type { FixDatesState } from './fixDatesData'
 import type { EducatorComment, TodoItem } from './rolloverData'
 
@@ -18,11 +18,11 @@ export const STATUS_LABEL: Record<ReadyStatus, string> = {
   pass: 'Ready',
   fixed: 'Fixed in the copy',
   later: 'Fix after the copy',
-  manual: 'Do it yourself',
+  manual: 'Action required',
 }
 
 const ALL_RULES = [...DESIGN_RULES, ...EXTRA_RULES]
-const FIXED: Choice[] = ['aifix', 'leave']
+const FIXED: Choice[] = ['aifix', 'aicheck', 'leave']
 
 // How each rule stands with the choices made so far. The rules are the sheet's, plus the accessibility checks.
 export function readiness(rows: ReviewRow[], choices: Record<string, Choice>): ReadyRule[] {
@@ -43,7 +43,7 @@ export function readiness(rows: ReviewRow[], choices: Record<string, Choice>): R
     out.push(
       open.length === 0
         ? { rule, status: 'fixed', note: `${hit.length === 1 ? hit[0].title : `${hit.length} items`} fixed or left out in the review.` }
-        : { rule, status: 'later', note: `${open.map((r) => r.title).join(', ')} still to fix after the copy.` },
+        : { rule, status: 'later', note: `${open.map((r) => r.title).join(', ')} to fix after the copy.` },
     )
   }
   return out
@@ -63,9 +63,17 @@ export const TODO_GROUPS = [
 ] as const
 
 // When students see the course.
-export type Opening = { mode: 'open' | 'self'; hold: boolean }
-export const INITIAL_OPENING: Opening = { mode: 'open', hold: false }
-export const OPENING_TIME = 'Tue, Jan 19 at 8:00 AM'
+// `date` is YYYY-MM-DD and `time` is HH:MM in the viewer's own time zone, the day and time the course publishes.
+export type Opening = { mode: 'open' | 'self'; hold: boolean; date: string; time: string }
+export const INITIAL_OPENING: Opening = { mode: 'open', hold: true, date: '2027-01-19', time: '08:00' }
+// The publish day and time as text, like "Tue, Jan 19 at 8:00 AM".
+export function openingLabel(o: Opening): string {
+  const [y, m, d] = o.date.split('-').map(Number)
+  const [h, min] = o.time.split(':').map(Number)
+  const day = new Date(y, m - 1, d, h, min)
+  if (Number.isNaN(day.getTime())) return 'the chosen date'
+  return `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
 
 export function buildTodo(args: {
   rows: ReviewRow[]
@@ -78,13 +86,19 @@ export function buildTodo(args: {
   const { rows, choices, ready, dates, comments, opening } = args
   const todo: TodoItem[] = []
 
+  // The to-do list follows the readiness check: every check that is not ready or fixed in the copy is on the list.
+  // "Later" checks are the problems still in the course after the copy (kept, fix later, or not decided yet).
+  for (const x of ready.filter((r) => r.status === 'later')) {
+    todo.push({ group: 'Fix after the copy', title: x.rule.title.replace(/\.$/, ''), detail: x.note })
+  }
   for (const r of rows) {
     const c = choiceOf(r, choices)
-    const why = r.findings[0]?.detail ?? r.note?.text ?? 'Chosen to fix after the copy.'
-    if (c === 'fix') todo.push({ group: 'Fix after the copy', title: `${r.title} (${r.kindLabel})`, detail: why })
-    if (c === 'aifix' && r.aiFix) todo.push({ group: 'Read the AI fixes', title: r.title, detail: `${r.aiFix.what}. Read it and check it still fits.` })
-    // A whole-course issue kept as it is stays a problem, and only the teacher can change it later.
-    if (r.courseWide && c === 'bring') todo.push({ group: 'Do it yourself', title: r.title, detail: `You kept this as it is. ${r.findings[0]?.detail ?? ''}`.trim() })
+    // Items chosen to fix later that no design check covers, like a note from the team.
+    if (c === 'fix' && r.findings.length === 0) {
+      todo.push({ group: 'Fix after the copy', title: `${r.title} (${r.kindLabel})`, detail: r.note?.text ?? 'Chosen to fix after the copy.' })
+    }
+    // An AI fix that was chosen with a review later.
+    if (c === 'aicheck' && r.aiFix) todo.push({ group: 'Read the AI fixes', title: r.title, detail: `${r.aiFix.what}. Check that it still fits.` })
   }
 
   for (const x of ready.filter((r) => r.status === 'manual')) {
@@ -97,16 +111,20 @@ export function buildTodo(args: {
   }
 
   if (dates.mode === 'clear') {
-    todo.push({ group: 'Set the dates', title: 'Set the dates of all items', detail: `${DATE_ITEMS.length} items come over with no date. They are listed on the course Settings page.` })
+    todo.push({ group: 'Set the dates', title: 'Set the dates of all items', detail: `${DATE_ITEMS.length} items are copied with no date. They are listed on the course Settings page.` })
   } else {
     for (const item of DATE_ITEMS) {
       const info = rowInfo(item, dates)
       if (info.finalClosed) todo.push({ group: 'Set the dates', title: item.title, detail: `Still on ${fmtShort(info.final ?? info.base)}, a non-teaching day. Choose a new date.` })
     }
+    // Items with no due date that were left empty are for the teacher to date later.
+    for (const item of NO_DATE_ITEMS) {
+      if ((dates.noDate[item.id] ?? 'empty') === 'empty') todo.push({ group: 'Set the dates', title: item.title, detail: 'It has no due date. Set one when you are ready.' })
+    }
   }
 
   if (opening.mode === 'self') {
-    todo.push({ group: 'Check after the copy', title: 'Open the course for students', detail: 'You chose to open it yourself. The course stays unpublished until you publish it.' })
+    todo.push({ group: 'Check after the copy', title: 'Publish the course', detail: 'You chose to publish it manually. The course stays unpublished until you do.' })
   }
   todo.push(
     { group: 'Check after the copy', title: 'Quiz settings, gradebook and publish state', detail: 'Copying does not publish anything. Check them before students arrive.' },

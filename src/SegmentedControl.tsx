@@ -103,6 +103,8 @@ export default function SegmentedControl({
         aria-disabled={disabled || undefined}
         style={{
           display: 'inline-flex',
+          // In a narrow space the options wrap onto a second row, so the bar never runs past its container.
+          flexWrap: 'wrap',
           gap: c.trackGap,
           padding: c.trackPadding,
           borderRadius: c.TrackBorderRadius,

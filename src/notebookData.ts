@@ -3,12 +3,12 @@ import type { Decision, EducatorComment } from './rolloverData'
 import type { CourseNav } from './GlobalNav'
 
 // Sample data for the educator Notebook. Everything here is made up.
-// The notebook belongs to the course the notes are about. This prototype uses one course, "Portfolio Test",
+// The notebook belongs to the course the notes are about. This prototype uses one course, "Design Portfolio",
 // the same course the copy wizard reads its comments from. Notes made here show up in the wizard's
 // "Review comments" step, so what the educator writes while teaching is there when the course is copied.
 
-export const NOTEBOOK_COURSE = 'Portfolio Test'
-const CODE = 'PT'
+export const NOTEBOOK_COURSE = 'Design Portfolio'
+const CODE = 'DES 310'
 
 export type ItemKind = 'Pages' | 'Assignments'
 

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { IconSearchLine, Pagination, RadioInput, ScreenReaderContent, SimpleSelect, Table, Text, TextInput } from '@instructure/ui/v11_7'
-import { SOURCE_COURSES, TIME_KINDS } from './courseListData'
+import { SOURCE_COURSES, SUB_ACCOUNTS, TIME_KINDS } from './courseListData'
 import type { SourceCourse } from './courseListData'
+import AutoSelect from './AutoSelect'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
 // Step 1 of the copy wizard: pick the course to copy from. One course can be chosen, so each row has a radio button.
@@ -9,19 +10,21 @@ import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
 const noFill = { background: 'transparent' }
 
-type SortKey = 'name' | 'teacher' | 'students' | 'time'
+type SortKey = 'name' | 'teacher' | 'students' | 'time' | 'checked'
 
 const PAGE_SIZE = 20
 // Only the real courses fill the first page. The pages after it repeat the list as placeholders, to show the paging.
 const DUMMY_PAGES = 12
-const ANY = 'any'
-const TAUGHT_BY = [
-  { id: ANY, label: 'Anyone' },
-  { id: 'me', label: 'You' },
-  { id: 'others', label: 'Other teachers' },
-]
-
 const taughtByYou = (c: SourceCourse) => c.teachers.includes('You')
+const ANY = 'any'
+// Everyone who teaches a course in the list: "You" first, then the other teachers by name.
+const TEACHERS = [
+  ...(SOURCE_COURSES.some(taughtByYou) ? ['You'] : []),
+  ...[...new Set(SOURCE_COURSES.flatMap((c) => c.teachers))].filter((n) => n !== 'You').sort((a, b) => a.localeCompare(b)),
+]
+const TEACHER_OPTIONS = [{ id: ANY, label: 'Anyone' }, ...TEACHERS.map((n) => ({ id: n, label: n }))]
+
+const SUB_ACCOUNT_OPTIONS = [{ id: ANY, label: 'All sub-accounts' }, ...SUB_ACCOUNTS.map((n) => ({ id: n, label: n }))]
 
 export default function SelectCourseStep({ selected, onSelect }: { selected: string; onSelect: (name: string) => void }) {
   const t = useSurfaceTokens()
@@ -29,6 +32,7 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
   const card = useAppThemeKey() !== 'legacy'
   const [query, setQuery] = useState('')
   const [taught, setTaught] = useState(ANY)
+  const [subAccount, setSubAccount] = useState(ANY)
   const [time, setTime] = useState(ANY)
   const [sortBy, setSortBy] = useState<SortKey | null>(null)
   const [ascending, setAscending] = useState(true)
@@ -38,17 +42,17 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
     const q = query.trim().toLowerCase()
     return SOURCE_COURSES.filter((c) => {
       if (q && !`${c.name} ${c.code} ${c.teachers.join(' ')}`.toLowerCase().includes(q)) return false
-      if (taught === 'me' && !taughtByYou(c)) return false
-      if (taught === 'others' && c.teachers.every((n) => n === 'You')) return false
+      if (subAccount !== ANY && c.subAccount !== subAccount) return false
+      if (taught !== ANY && !c.teachers.includes(taught)) return false
       if (time !== ANY && c.timeKind !== time) return false
       return true
     })
-  }, [query, taught, time])
+  }, [query, taught, time, subAccount])
 
   const rows = useMemo(() => {
     if (!sortBy) return shown
     const value = (c: SourceCourse) =>
-      sortBy === 'name' ? c.name.toLowerCase() : sortBy === 'teacher' ? c.teachers.join(', ').toLowerCase() : sortBy === 'students' ? c.students : Date.parse(c.date)
+      sortBy === 'name' ? c.name.toLowerCase() : sortBy === 'teacher' ? c.teachers.join(', ').toLowerCase() : sortBy === 'students' ? c.students : sortBy === 'checked' ? (c.readinessCheckedOn ? Date.parse(c.readinessCheckedOn) : 0) : Date.parse(c.date)
     const sorted = [...shown].sort((a, b) => (value(a) > value(b) ? 1 : value(a) < value(b) ? -1 : 0))
     return ascending ? sorted : sorted.reverse()
   }, [shown, sortBy, ascending])
@@ -75,7 +79,7 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
 
   const filter = (label: string, value: string, set: (v: string) => void, options: { id: string; label: string }[]) => (
     <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
-      <SimpleSelect renderLabel={label} value={value} onChange={(_e, { value: v }) => set(String(v))}>
+      <SimpleSelect renderLabel={<Text weight="bold">{label}</Text>} value={value} onChange={(_e, { value: v }) => set(String(v))}>
         {options.map((o) => (
           <SimpleSelect.Option key={o.id} id={`${label}-${o.id}`} value={o.id}>{o.label}</SimpleSelect.Option>
         ))}
@@ -86,16 +90,37 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'flex-end' }}>
-        <div style={{ flex: '2 1 16rem', minWidth: 0 }}>
+        {/* The sub-account decides which courses are in the list at all, so it stands apart from the search and filters. */}
+        <div style={{ flex: '1 1 16rem', minWidth: 0 }}>
+          <AutoSelect
+            label="Sub-account"
+            assistiveText="Type to find a sub-account. Use the up and down arrow keys to choose."
+            noMatch="No sub-account matches"
+            options={SUB_ACCOUNT_OPTIONS}
+            value={subAccount}
+            onChange={(v) => { setSubAccount(v); setPage(1) }}
+          />
+        </div>
+        <div aria-hidden="true" style={{ alignSelf: 'flex-end', height: '2.375rem', width: t.borderWidth, background: t.strokeBase, margin: `0 ${t.space.sm}` }} />
+        <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
           <TextInput
-            renderLabel="Search courses"
+            renderLabel={<Text weight="bold">Search courses</Text>}
             placeholder="Course name, code or teacher"
             renderBeforeInput={<IconSearchLine />}
             value={query}
             onChange={(_e, value) => { setQuery(value); setPage(1) }}
           />
         </div>
-        {filter('Taught by', taught, (v) => { setTaught(v); setPage(1) }, TAUGHT_BY)}
+        <div style={{ flex: '1 1 12rem', minWidth: 0 }}>
+          <AutoSelect
+            label="Taught by"
+            assistiveText="Type to find a teacher. Use the up and down arrow keys to choose."
+            noMatch="No teacher matches"
+            options={TEACHER_OPTIONS}
+            value={taught}
+            onChange={(v) => { setTaught(v); setPage(1) }}
+          />
+        </div>
         {filter('Time', time, (v) => { setTime(v); setPage(1) }, [{ id: ANY, label: 'Any time' }, ...TIME_KINDS.map((k) => ({ id: k, label: k }))])}
       </div>
 
@@ -140,6 +165,7 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
                 <Table.ColHeader themeOverride={noFill} id="name" {...sortProps('name')}>Course</Table.ColHeader>
                 <Table.ColHeader themeOverride={noFill} id="teacher" {...sortProps('teacher')}>Taught by</Table.ColHeader>
                 <Table.ColHeader themeOverride={noFill} id="students" {...sortProps('students')}>Students</Table.ColHeader>
+                <Table.ColHeader themeOverride={noFill} id="checked" {...sortProps('checked')}>Last readiness check</Table.ColHeader>
                 <Table.ColHeader themeOverride={noFill} id="time" {...sortProps('time')}>Time</Table.ColHeader>
               </Table.Row>
             </Table.Head>
@@ -164,9 +190,12 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
                   <Table.Cell themeOverride={noFill}>
                     <Text weight="bold">{c.name}</Text>
                     <Text as="div" size="small" color="secondary">{c.code}</Text>
+                    <Text as="div" size="small" color="secondary">SIS ID: {c.sisId}</Text>
                   </Table.Cell>
                   <Table.Cell themeOverride={noFill}>{c.teachers.join(', ')}</Table.Cell>
                   <Table.Cell themeOverride={noFill}>{c.students}</Table.Cell>
+                  {/* Empty when the readiness check never ran on this course. */}
+                  <Table.Cell themeOverride={noFill}>{c.readinessCheckedOn ?? ''}</Table.Cell>
                   <Table.Cell themeOverride={noFill}>
                     <Text as="div">{c.timeKind}</Text>
                     <Text as="div" size="small" color="secondary">{c.date}</Text>

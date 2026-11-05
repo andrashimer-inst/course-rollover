@@ -17,8 +17,8 @@ import type { ThemeKey } from './appTheme'
 // The Theme overlay that sits on every design so all three themes can be checked. Drag the "Theme" title
 // (or focus it and use the arrow keys) to move it. The chevron collapses it to the title alone.
 // `children` adds page-specific controls under the theme buttons (the template's Layout options).
-// It starts bottom right and, while a utility panel is open, moves left of it (the wrapper sets
-// --wrapper-panel-width). Once the user has moved it, it stays where they put it.
+// It starts at the bottom left, so the utility panels on the right never cover it. Once the user has moved it, it
+// stays where they put it.
 
 type Props = {
   themeKey: ThemeKey
@@ -86,7 +86,7 @@ export default function ThemeSwitcher({ themeKey, onChange, children }: Props) {
         '--theme-selected': blue,
         ...(pos
           ? { left: pos.left, top: pos.top }
-          : { right: 'calc(1rem + var(--wrapper-panel-width, 0px))', bottom: 16 }),
+          : { left: 16, bottom: 16 }),
       } as unknown as CSSProperties}
     >
       {/* The box looks the same in every theme: Legacy borrows the Light styling. */}

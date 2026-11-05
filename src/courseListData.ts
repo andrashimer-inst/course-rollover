@@ -7,17 +7,21 @@ export type SourceCourse = {
   code: string
   // The ID from the student information system, shown to tell similar courses apart.
   sisId: string
+  // The sub-account the course belongs to.
+  subAccount: string
   // "You" for the signed-in educator, otherwise the names of the other teachers.
   teachers: string[]
   students: number
   timeKind: TimeKind
   date: string
+  // When the course readiness check last ran on this course. Missing when it never ran.
+  readinessCheckedOn?: string
 }
 
 export const TIME_KINDS: TimeKind[] = ['Last used', 'Concluded', 'Last updated']
 
-const RAW_COURSES: Omit<SourceCourse, 'sisId'>[] = [
-  { name: 'Portfolio Test', code: 'PT', teachers: ['You'], students: 28, timeKind: 'Last used', date: 'Oct 6, 2025' },
+const RAW_COURSES: Omit<SourceCourse, 'sisId' | 'readinessCheckedOn' | 'subAccount'>[] = [
+  { name: 'Design Portfolio', code: 'DES 310', teachers: ['You'], students: 28, timeKind: 'Last used', date: 'Oct 6, 2025' },
   { name: 'Biology 101', code: 'BIO 101', teachers: ['Maria Okafor'], students: 112, timeKind: 'Concluded', date: 'Dec 19, 2025' },
   { name: 'Intro to Design', code: 'DES 110', teachers: ['You', 'Dana Reyes'], students: 36, timeKind: 'Last updated', date: 'Nov 2, 2025' },
   { name: 'World History', code: 'HIS 120', teachers: ['Tomas Lindgren'], students: 64, timeKind: 'Concluded', date: 'May 15, 2025' },
@@ -55,4 +59,40 @@ const RAW_COURSES: Omit<SourceCourse, 'sisId'>[] = [
   { name: 'Spanish for Beginners', code: 'SPA 101', teachers: ['Tomas Lindgren'], students: 62, timeKind: 'Concluded', date: 'Dec 16, 2024' },
 ]
 
-export const SOURCE_COURSES: SourceCourse[] = RAW_COURSES.map((c, i) => ({ ...c, sisId: `SIS-${2025100 + i * 7 + 3}` }))
+// Courses the readiness check has run on, and when. The others have never been checked.
+const CHECKED: Record<string, string> = {
+  'Design Portfolio': 'Oct 7, 2025',
+  'Intro to Design': 'Nov 3, 2025',
+  'Typography Studio': 'Sep 29, 2025',
+  'Creative Writing Workshop': 'Oct 21, 2025',
+  'Introduction to Python': 'Oct 15, 2025',
+  'User Research Lab': 'Oct 4, 2025',
+  'Interaction Design Studio': 'Oct 10, 2025',
+  'Machine Learning Basics': 'Oct 17, 2025',
+  'Academic Writing': 'Oct 25, 2025',
+  'Design Systems': 'Oct 13, 2025',
+  'Accessibility in Practice': 'Oct 23, 2025',
+  'Biology 101': 'Dec 20, 2025',
+}
+
+export const SUB_ACCOUNTS = [
+  'College of Arts and Design',
+  'School of Business',
+  'School of Humanities and Social Sciences',
+  'School of Science and Engineering',
+]
+
+// The sub-account follows the subject in the short code.
+const SUB_ACCOUNT_OF: Record<string, string> = {
+  DES: SUB_ACCOUNTS[0], ART: SUB_ACCOUNTS[0], FIL: SUB_ACCOUNTS[0], MUS: SUB_ACCOUNTS[0], STA: SUB_ACCOUNTS[0],
+  BUS: SUB_ACCOUNTS[1], ECO: SUB_ACCOUNTS[1],
+  ENG: SUB_ACCOUNTS[2], HIS: SUB_ACCOUNTS[2], SOC: SUB_ACCOUNTS[2], PSY: SUB_ACCOUNTS[2], PHI: SUB_ACCOUNTS[2], SPA: SUB_ACCOUNTS[2], COM: SUB_ACCOUNTS[2], RES: SUB_ACCOUNTS[2],
+  BIO: SUB_ACCOUNTS[3], CHE: SUB_ACCOUNTS[3], PHY: SUB_ACCOUNTS[3], MAT: SUB_ACCOUNTS[3], ENV: SUB_ACCOUNTS[3], GEO: SUB_ACCOUNTS[3], CS: SUB_ACCOUNTS[3],
+}
+
+export const SOURCE_COURSES: SourceCourse[] = RAW_COURSES.map((c, i) => ({
+  ...c,
+  sisId: `SIS-${2025100 + i * 7 + 3}`,
+  readinessCheckedOn: CHECKED[c.name],
+  subAccount: SUB_ACCOUNT_OF[c.code.split(' ')[0]],
+}))

@@ -146,6 +146,20 @@ export function NotificationsPanel({ onClose, children }: PanelProps & { childre
   )
 }
 
+// --- A panel the page fills itself ----------------------------------------------------------------
+
+export function CustomPanel({ title, description, onClose, children }: PanelProps & { title: string; description: string; children: ReactNode }) {
+  const t = useSurfaceTokens()
+  return (
+    <div style={{ ...useCardStyle(), padding: t.paddingCardMd }}>
+      <div style={{ boxSizing: 'border-box', padding: t.space.md, display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+        <PanelHeader title={title} description={description} onClose={onClose} />
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // --- AI agent ------------------------------------------------------------------------------------
 
 export function AiAgentPanel({ onClose }: PanelProps) {

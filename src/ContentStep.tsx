@@ -20,12 +20,13 @@ import { TYPE_ICON, countPicked, keys, pulledInBy, withPulledIn } from './conten
 import type { CopyMode, Picked, Scope } from './contentHelpers'
 import type { ModuleEntry } from './courseContentData'
 import FigmaAlert from './FigmaAlert'
+import SegmentedControl from './SegmentedControl'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
 const MODULES = CONTENT_TYPES.find((c) => c.id === 'modules')!.items
 
-// Step 2 of the copy wizard: what comes over. Two cards to choose from: the whole course, or part of it.
-// "Part of it" opens a list of learning objects to tick. Whenever modules come over, a preview shows how the course looks.
+// Step 2 of the copy wizard: content to copy. Two cards to choose from: the whole course, or part of it.
+// "Part of it" opens a list of learning objects to tick. Whenever modules are copied, a preview shows how the course looks.
 
 const KIND_ICON: Record<ModuleEntry['kind'], ReactNode> = {
   assignment: <IconAssignmentLine />,
@@ -82,25 +83,35 @@ export default function ContentStep({
           checked={on}
           onChange={() => setScope(id)}
           label={
-            <span style={{ display: 'block' }}>
+            <span style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
               <Text weight="bold">{title}</Text>
               <Text as="div" color="secondary">{body}</Text>
             </span>
           }
         />
-        {extra && <div style={{ marginTop: t.space.lg }}>{extra}</div>}
+        {/* The extra part only shows when the card is selected. Its space stays, so both cards keep the same height. */}
+        {extra && (
+          <div
+            style={{ marginTop: t.space.lg, visibility: on ? 'visible' : 'hidden' }}
+            aria-hidden={!on}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            {...(!on ? ({ inert: '' } as any) : {})}
+          >
+            {extra}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.xl }}>
-      <div role="radiogroup" aria-label="What comes over" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: t.space.lg }}>
+      <div role="radiogroup" aria-label="Content to copy" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: t.space.lg }}>
         {card(
           'whole',
           'The whole course',
           `${MODULES.length} modules and all learning objects.`,
-scope === 'whole' && (
+(
             <FigmaAlert variant="warning" type="inline">
               Copying the whole course replaces the content that is in this course now.
             </FigmaAlert>
@@ -110,40 +121,28 @@ scope === 'whole' && (
           'part',
           'Part of it',
           CONTENT_TYPES.map((c) => c.label).join(', ') + '.',
-          scope === 'part' && (
-            <div onClick={(e) => e.stopPropagation()} role="radiogroup" aria-labelledby="content-mode-label">
-              <Text weight="bold" id="content-mode-label">How should it come over?</Text>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, marginTop: t.space.sm }}>
-                {([
-                  ['merge', 'Merge it with the current course'],
-                  ['replace', 'Replace the current course'],
-                ] as const).map(([value, label]) => (
-                  <div
-                    key={value}
-                    onClick={() => setMode(value)}
-                    style={{
-                      flex: '1 1 7rem',
-                      minWidth: 0,
-                      boxSizing: 'border-box',
-                      cursor: 'pointer',
-                      padding: t.space.md,
-                      borderRadius: t.radiusCardSm,
-                      background: t.containerColor,
-                      border: `${mode === value ? '0.125rem' : t.borderWidth} solid ${mode === value ? t.linkColor : t.borderColor}`,
-                    }}
-                  >
-                    <RadioInput name="content-mode" size="small" value={value} checked={mode === value} onChange={() => setMode(value)} label={label} />
-                  </div>
-                ))}
+          (
+            <div onClick={(e) => e.stopPropagation()}>
+              <div>
+                <SegmentedControl
+                  label="How should it be copied?"
+                  value={mode}
+                  onChange={(v) => setMode(v as CopyMode)}
+                  options={[
+                    { value: 'merge', label: 'Merge it with the current content' },
+                    { value: 'replace', label: 'Replace the current content' },
+                  ]}
+                />
               </div>
             </div>
           ),
         )}
       </div>
 
+      {/* The list to tick from and the preview of the course sit side by side. On a narrow page they stack. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: t.space.xl }}>
       {scope === 'part' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
-          <Text weight="bold">Choose the learning objects to copy</Text>
+        <div style={{ flex: '1 1 24rem', minWidth: 0, display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
           <div
             style={{
               background: t.containerColor,
@@ -152,6 +151,9 @@ scope === 'whole' && (
               padding: t.space.lg,
             }}
           >
+            <div style={{ marginBottom: t.space.md }}>
+              <Text weight="bold">Choose the learning objects to copy</Text>
+            </div>
             <Checkbox
               label="Select all"
               checked={allCount === allKeys.length}
@@ -208,7 +210,7 @@ scope === 'whole' && (
                         return from ? (
                           <Tooltip
                             key={item.id}
-                            renderTip={`Part of ${from.map((n) => `“${n}”`).join(' and ')}, so it comes over with the module. To leave it out, untick the module.`}
+                            renderTip={`Part of ${from.map((n) => `“${n}”`).join(' and ')}, so it is copied with the module. To leave it out, untick the module.`}
                             placement="top start"
                           >
                             <span tabIndex={0} style={{ display: 'inline-block', width: 'fit-content' }}>{box}</span>
@@ -227,15 +229,18 @@ scope === 'whole' && (
       )}
 
       {(comingModules.length > 0 || (scope === 'part' && mode === 'merge')) && (
-        <CoursePreview moduleIds={comingModules.map((m) => m.id)} keepCurrent={scope === 'part' && mode === 'merge'} highlightNew={scope === 'part'} hidden={hidden} />
+        <div style={{ flex: '1 1 24rem', minWidth: 0 }}>
+          <CoursePreview moduleIds={comingModules.map((m) => m.id)} keepCurrent={scope === 'part' && mode === 'merge'} highlightNew={scope === 'part'} hidden={hidden} titleSize="medium" />
+        </div>
       )}
+      </div>
     </div>
   )
 }
 
-// How the course looks with the modules that come over: grey module bars with their items under them.
+// How the course looks with the modules that are copied: grey module bars with their items under them.
 export function CoursePreview({
-  moduleIds, keepCurrent, highlightNew, hidden, hiddenItems, noteFor, title,
+  moduleIds, keepCurrent, highlightNew, hidden, hiddenItems, noteFor, title, titleSize = 'large',
 }: {
   moduleIds: string[]
   keepCurrent: boolean
@@ -245,7 +250,10 @@ export function CoursePreview({
   // Items left out of the copy are not shown, and an item can carry a note (like an AI fix).
   hiddenItems?: Set<string>
   noteFor?: (itemId: string) => ReactNode
-  title?: string
+  // `false` leaves the title out and keeps the description.
+  title?: string | false
+  // The size of the title. Step 2 uses the size of the card title beside it.
+  titleSize?: 'medium' | 'large'
 }) {
   const t = useSurfaceTokens()
   const legacy = useAppThemeKey() === 'legacy'
@@ -258,15 +266,20 @@ export function CoursePreview({
   const current = keepCurrent ? CURRENT_MODULES.map((m) => ({ ...m, isNew: false })) : []
   // Names are kept as they are, so two modules can have the same name.
   const list = [...current, ...coming].filter((m) => !hidden?.has(m.id))
+  // Card title and description: a small gap between them, like the Card component in Figma.
+  const heading = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+      {title !== false && <Text as="div" weight="bold" size={titleSize} id="course-preview">{title ?? 'Preview'}</Text>}
+      <Text as="div" color="secondary">
+        {moduleIds.length} of {MODULES.length} modules will be copied.{keepCurrent ? '' : ' They replace the current course content.'}
+      </Text>
+    </div>
+  )
   return (
-    <section aria-labelledby="course-preview" style={{ display: 'flex', flexDirection: 'column', gap: t.space.md }}>
+    <section aria-labelledby="course-preview" style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+      {/* In Light and Dark the title sits inside the card. Legacy has no card, so it stays above the list. */}
+      {legacy && heading}
       <style>{`.module-toggle:focus-visible { outline: 0.125rem solid currentColor; outline-offset: -0.25rem; }`}</style>
-      <div>
-        <Text as="div" weight="bold" id="course-preview">{title ?? 'How the course will look'}</Text>
-        <Text as="div" color="secondary">
-          {moduleIds.length} of {MODULES.length} modules come over.{keepCurrent ? ' Blue modules are new. Grey modules are already in this course.' : ' They replace what is in this course now.'}
-        </Text>
-      </div>
       <div
         style={{
           display: 'flex',
@@ -278,6 +291,7 @@ export function CoursePreview({
           padding: legacy ? undefined : t.space.lg,
         }}
       >
+        {!legacy && heading}
         {list.map((m) => (
           <div
             key={m.id}
@@ -287,8 +301,8 @@ export function CoursePreview({
               overflow: 'hidden',
             }}
           >
-            {/* Modules that come over get a blue bar. Modules already in the course keep the light grey bar. */}
-            {/* Modules that come over get a blue bar. Modules already in the course keep the light grey bar. */}
+            {/* Modules that are copied get a blue bar. Modules already in the course keep the light grey bar. */}
+            {/* Modules that are copied get a blue bar. Modules already in the course keep the light grey bar. */}
             <View as="div" background={legacy && !(m.isNew && highlightNew) ? 'secondary' : undefined}>
               <button
                 type="button"
@@ -315,6 +329,12 @@ export function CoursePreview({
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <Text weight="bold" color={m.isNew && highlightNew ? 'primary-inverse' : undefined}>{m.label}</Text>
                 </span>
+                {/* When the copy is merged into the course, each module says if it is already there or is new. */}
+                {keepCurrent && (
+                  <Text size="small" color={m.isNew && highlightNew ? 'primary-inverse' : 'secondary'}>
+                    {m.isNew ? 'New' : 'Existing'}
+                  </Text>
+                )}
               </button>
             </View>
             {!closed[m.id] && m.entries.filter((e) => !hiddenItems?.has(e.itemId)).map((e) => (

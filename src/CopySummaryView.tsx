@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Button, CloseButton, Heading, IconExportLine, Link, Metric, Modal, ScreenReaderContent, SimpleSelect, Table, Text, Tooltip } from '@instructure/ui/v11_7'
+import { Button, IconArrowOpenEndSolid, IconArrowOpenStartSolid, IconButton, IconExportLine, IconSearchLine, Link, Metric, ScreenReaderContent, SimpleSelect, Table, Tabs, Text, TextInput } from '@instructure/ui/v11_7'
+import AutoSelect from './AutoSelect'
 import FigmaAlert from './FigmaAlert'
 import StatusPill from './StatusPill'
 import { PEOPLE } from './copyHistory'
-import { UNDO_BLOCKED } from './sampleImports'
 import { TODO_GROUPS, exportTodo } from './reviewCopyData'
 import type { CopySummary, HistoryEvent } from './rolloverData'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
@@ -21,11 +21,11 @@ const TAG_COLOR: Record<HistoryEvent['tag'], 'neutral' | 'info' | 'success' | 'a
 }
 
 // The history can be filtered by the kind of entry or by the person who did it.
-const TYPE_FILTERS = [['all', 'All'], ['type:Decision', 'Decisions'], ['type:Created', 'Created'], ['type:Automatic', 'Automatic']] as const
-const PERSON_FILTERS = PEOPLE.map((p) => [`who:${p}`, p] as const)
+const TYPE_FILTERS = [['all', 'All types'], ['Decision', 'Decisions'], ['Created', 'Created'], ['Automatic', 'Automatic'], ['Session', 'Session']] as const
+const PERSON_FILTERS = [['all', 'All users'], ...PEOPLE.map((p) => [p, p] as const)] as const
 
 function exportHistory(list: HistoryEvent[], course: string) {
-  const rows = [['When', 'Type', 'What happened', 'Who'], ...list.map((h) => [h.when, h.tag, h.text, h.who])]
+  const rows = [['Date and time', 'Type', 'Activity', 'User'], ...list.map((h) => [h.when, h.tag, h.text, h.who])]
   const csv = rows.map((row) => row.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
   const a = document.createElement('a')
@@ -36,13 +36,10 @@ function exportHistory(list: HistoryEvent[], course: string) {
 }
 
 export function SummaryView({
-  summary, published = false, undone: wasUndone = false, onUndo,
+  summary, undone: wasUndone = false,
 }: {
   summary: CopySummary
-  // Once the course is published, a copy cannot be undone any more.
-  published?: boolean
   undone?: boolean
-  onUndo?: () => void
 }) {
   const t = useSurfaceTokens()
   const card = useAppThemeKey() !== 'legacy'
@@ -52,62 +49,92 @@ export function SummaryView({
 
   // Bringing an item now is shown here: the item leaves the list and counts as created.
   const [brought, setBrought] = useState<string[]>([])
-  const [undoneNow, setUndone] = useState(false)
-  const undone = wasUndone || undoneNow
-  const [confirmUndo, setConfirmUndo] = useState(false)
-  const [filter, setFilter] = useState('all')
+  const undone = wasUndone
+  // The history is filtered by the type of entry and by the person, separately.
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [personFilter, setPersonFilter] = useState('all')
+  const [tab, setTab] = useState(0)
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
 
-  const notCopied = [
-    ...summary.notCame.map((n) => ({ item: n.item, reason: n.kind === 'left-out' ? `Left out: ${n.reason}` : n.reason, canBring: n.kind === 'left-out' })),
-    ...summary.failed.map((f) => ({ item: f.item, reason: `Failed: ${f.reason}`, canBring: false })),
+  // What was not copied. A failure is an error, not a decision, so it has a red pill and is on the to-do list.
+  type NotCopied = { item: string; reason: string; kind: 'failed' | 'left-out' | 'canvas' | 'attention'; canBring: boolean }
+  const notCopied: NotCopied[] = [
+    ...summary.failed.map((f) => ({ item: f.item, reason: f.reason, kind: 'failed' as const, canBring: false })),
+    ...summary.notCame.map((n) => ({ item: n.item, reason: n.reason, kind: n.kind, canBring: n.kind === 'left-out' })),
   ].filter((n) => !brought.includes(n.item))
+  const NOT_COPIED_PILL: Record<NotCopied['kind'], { label: string; color: 'error' | 'info' | 'neutral' | 'warning' }> = {
+    failed: { label: 'Failed', color: 'error' },
+    'left-out': { label: 'Left out', color: 'info' },
+    canvas: { label: 'Not copied by Canvas', color: 'neutral' },
+    attention: { label: 'Needs attention', color: 'warning' },
+  }
+  // Every failure is on the to-do list, also on copies where the list did not have it yet.
+  const todoAll = [
+    ...summary.todo,
+    ...summary.failed
+      .filter((f) => !summary.todo.some((x) => x.title === `Copy failed: ${f.item}`))
+      .map((f) => ({ group: 'Fix after the copy', title: `Copy failed: ${f.item}`, detail: f.fix })),
+  ]
 
-  const history = summary.history.filter(
-    (h) => filter === 'all' || (filter.startsWith('type:') ? h.tag === filter.slice(5) : h.who === filter.slice(4)),
-  )
-  const stills = summary.todo.length
+  const history = summary.history
+    .filter((h) => typeFilter === 'all' || h.tag === typeFilter)
+    .filter((h) => personFilter === 'all' || h.who === personFilter)
+    .filter((h) => !query.trim() || `${h.when} ${h.tag} ${h.text} ${h.who}`.toLowerCase().includes(query.trim().toLowerCase()))
+  // The history shows 20 entries a page. Searching or filtering starts again on the first page.
+  const PAGE_SIZE = 20
+  const pageCount = Math.max(1, Math.ceil(history.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageRows = history.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  // Previous and next arrows with the page numbers between them. The arrows are always there, also with few pages.
+  const pageNumbers: (number | 'gap')[] = []
+  for (let n = 1; n <= pageCount; n++) {
+    if (n === 1 || n === pageCount || Math.abs(n - currentPage) <= 1 || pageCount <= 7) pageNumbers.push(n)
+    else if (pageNumbers[pageNumbers.length - 1] !== 'gap') pageNumbers.push('gap')
+  }
+  const pager =
+    pageCount > 1 ? (
+      <nav aria-label="Copy history pages" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: t.space.sm }}>
+        <IconButton screenReaderLabel="Previous page" size="small" interaction={currentPage > 1 ? 'enabled' : 'disabled'} onClick={() => setPage(currentPage - 1)}>
+          <IconArrowOpenStartSolid />
+        </IconButton>
+        {pageNumbers.map((n, i) =>
+          n === 'gap' ? (
+            <Text key={`gap-${i}`} color="secondary">…</Text>
+          ) : (
+            <Button
+              key={n}
+              size="small"
+              color={n === currentPage ? 'primary' : 'secondary'}
+              aria-current={n === currentPage ? 'page' : undefined}
+              onClick={() => setPage(n)}
+            >
+              <ScreenReaderContent>Page </ScreenReaderContent>
+              {n}
+            </Button>
+          ),
+        )}
+        <IconButton screenReaderLabel="Next page" size="small" interaction={currentPage < pageCount ? 'enabled' : 'disabled'} onClick={() => setPage(currentPage + 1)}>
+          <IconArrowOpenEndSolid />
+        </IconButton>
+      </nav>
+    ) : null
+  const stills = todoAll.length
   const created = summary.stats.created + brought.length
 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.xl }}>
       <section aria-labelledby="set-up" style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
-        {/* The result on the left, the two actions on the top right. */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <Heading level="h2" variant="titleSection" id="set-up">
-              {undone ? `${summary.target} was set back to empty` : `${summary.target} Spring 2027 is set up`}
-            </Heading>
-            <Text as="div" color="secondary">{undone ? 'The copy was undone. Your choices are kept.' : summary.opens}</Text>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.sm }}>
-            {!undone && <Button color="primary">Open course</Button>}
-            <Tooltip
-              renderTip={
-                published
-                  ? UNDO_BLOCKED
-                  : `Removes everything this copy created. Your ${summary.target} Spring 2027 course goes back to empty. Your choices are kept.`
-              }
-              placement="bottom end"
-            >
-              {/* A disabled button gets no hover, so the tooltip sits on a wrapper that can also take focus. */}
-              <span tabIndex={0} style={{ display: 'inline-flex' }}>
-                <Button color="danger" interaction={undone || published ? 'disabled' : 'enabled'} onClick={() => setConfirmUndo(true)}>
-                  Undo the whole copy
-                </Button>
-              </span>
-            </Tooltip>
-          </div>
-        </div>
         {!undone && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', gap: t.space.lg }}>
             {[
-              [created, 'items created'],
-              [summary.stats.relinked, 'tools relinked automatically'],
-              [summary.stats.sentToAdmin, 'sent to your admin'],
-              [summary.stats.datesPlaced, 'dates placed'],
-              [notCopied.length, 'not copied'],
-              [stills, 'still to do'],
+              [created, 'Items copied'],
+              [summary.stats.relinked, 'Tools relinked'],
+              [summary.stats.sentToAdmin, 'Sent to admin'],
+              [summary.stats.datesPlaced, 'Dates updated'],
+              [notCopied.length, 'Not copied'],
+              [stills, 'Open to-do items'],
             ].map(([value, label]) => (
               <div
                 key={label}
@@ -132,129 +159,221 @@ export function SummaryView({
         </FigmaAlert>
       )}
 
-      {!undone && (
-        <section aria-labelledby="not-copied" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
-          <Heading level="h3" variant="titleCardRegular" id="not-copied">Not copied ({notCopied.length})</Heading>
-          {notCopied.length === 0 && <Text color="secondary">Everything you chose came over.</Text>}
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {notCopied.map((n) => (
-              <li key={n.item} style={{ display: 'flex', justifyContent: 'space-between', gap: t.space.md, padding: `${t.space.sm} 0`, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}>
-                <span>
-                  <Text weight="bold">{n.item}</Text> <Text color="secondary">{n.reason}</Text>
-                </span>
-                {n.canBring && (
-                  <Link as="button" onClick={() => setBrought([...brought, n.item])}>
-                    Bring it now<ScreenReaderContent>: {n.item}</ScreenReaderContent>
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {!undone && (
-        <section aria-labelledby="todo" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <Heading level="h3" variant="titleCardRegular" id="todo">To-do list ({summary.todo.length})</Heading>
-              <Text color="secondary">What is left for you to do by hand. Export it to keep it for yourself.</Text>
-            </div>
-            <Button renderIcon={<IconExportLine />} onClick={() => exportTodo(summary.todo, summary.course)}>
-              Export to-do list
-            </Button>
-          </div>
-          <Table caption={() => 'To-do list after the copy'} themeOverride={noFill}>
-            <Table.Head themeOverride={noFill}>
-              <Table.Row themeOverride={noFill}>
-                <Table.ColHeader themeOverride={noFill} id="todo-item" width="35%">To do</Table.ColHeader>
-                <Table.ColHeader themeOverride={noFill} id="todo-detail">Details</Table.ColHeader>
-              </Table.Row>
-            </Table.Head>
-            <Table.Body themeOverride={noFill}>
-              {TODO_GROUPS.flatMap((g) => {
-                const items = summary.todo.filter((x) => x.group === g)
-                if (items.length === 0) return []
-                return [
-                  <Table.Row themeOverride={noFill} key={`g-${g}`}>
-                    <Table.Cell themeOverride={noFill}><Text weight="bold">{g} ({items.length})</Text></Table.Cell>
-                    <Table.Cell themeOverride={noFill} />
-                  </Table.Row>,
-                  ...items.map((x) => (
-                    <Table.Row themeOverride={noFill} key={`${g}-${x.title}`}>
-                      <Table.Cell themeOverride={noFill}>{x.title}</Table.Cell>
-                      <Table.Cell themeOverride={noFill}>{x.detail}</Table.Cell>
-                    </Table.Row>
-                  )),
-                ]
-              })}
-            </Table.Body>
-          </Table>
-        </section>
-      )}
-
-      <section aria-labelledby="history" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <div>
-            <Heading level="h3" variant="titleCardRegular" id="history">Copy history ({history.length === summary.history.length ? summary.history.length : `${history.length} of ${summary.history.length}`})</Heading>
-            <Text color="secondary">Everyone on the course and your admin see the same history. Newest first.</Text>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.sm, alignItems: 'flex-end' }}>
-            <div style={{ width: '16rem' }}>
-              <SimpleSelect
-                renderLabel={<ScreenReaderContent>Show</ScreenReaderContent>}
-                value={filter}
-                onChange={(_e, { value }) => setFilter(String(value))}
-              >
-                {TYPE_FILTERS.map(([id, label]) => (
-                  <SimpleSelect.Option key={id} id={`history-${id}`} value={id}>{label}</SimpleSelect.Option>
+      {!undone ? (
+        <Tabs onRequestTabChange={(_e, { index }) => setTab(index)}>
+          <Tabs.Panel id="tab-not-copied" renderTitle={`Not copied (${notCopied.length})`} isSelected={tab === 0} padding="general.spaceXl 0 0 0">
+            <section aria-label="Not copied" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                <Text as="div" weight="bold" size="large">Not copied</Text>
+                <Text as="div" color="secondary">
+                  {notCopied.length === 0
+                    ? 'Everything you chose was copied.'
+                    : 'These items were not copied. Items that failed are on your to-do list so you can fix them.'}
+                </Text>
+              </div>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {notCopied.map((n) => (
+                  <li key={n.item} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, padding: `${t.space.md} 0`, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}>
+                    <span style={{ flex: '1 1 18rem', minWidth: 0 }}>
+                      <Text as="div" weight="bold">{n.item}</Text>
+                      <Text as="div" color="secondary">{n.reason}</Text>
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: t.space.md }}>
+                      {n.canBring && (
+                        <Link as="button" onClick={() => setBrought([...brought, n.item])}>
+                          Copy it now<ScreenReaderContent>: {n.item}</ScreenReaderContent>
+                        </Link>
+                      )}
+                      <StatusPill size="sm" color={NOT_COPIED_PILL[n.kind].color}>{NOT_COPIED_PILL[n.kind].label}</StatusPill>
+                    </span>
+                  </li>
                 ))}
-                <SimpleSelect.Group renderLabel="By person">
-                  {PERSON_FILTERS.map(([id, label]) => (
-                    <SimpleSelect.Option key={id} id={`history-${id}`} value={id}>{label}</SimpleSelect.Option>
-                  ))}
-                </SimpleSelect.Group>
-              </SimpleSelect>
-            </div>
+              </ul>
+            </section>
+          </Tabs.Panel>
+          <Tabs.Panel id="tab-todo" renderTitle={`To-do list (${todoAll.length})`} isSelected={tab === 1} padding="general.spaceXl 0 0 0">
+            <section aria-label="To-do list" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                  <Text as="div" weight="bold" size="large">To-do list</Text>
+                  <Text as="div" color="secondary">Actions that still need your attention after the copy. Export the list to keep it.</Text>
+                </div>
+                <Button renderIcon={<IconExportLine />} onClick={() => exportTodo(todoAll, summary.course)}>
+                  Export to-do list
+                </Button>
+              </div>
+              <Table caption={() => 'To-do list after the copy'} themeOverride={noFill}>
+                <Table.Head themeOverride={noFill}>
+                  <Table.Row themeOverride={noFill}>
+                    <Table.ColHeader themeOverride={noFill} id="todo-item" width="35%">To do</Table.ColHeader>
+                    <Table.ColHeader themeOverride={noFill} id="todo-detail">Details</Table.ColHeader>
+                  </Table.Row>
+                </Table.Head>
+                <Table.Body themeOverride={noFill}>
+                  {TODO_GROUPS.flatMap((g) => {
+                    const items = todoAll.filter((x) => x.group === g)
+                    if (items.length === 0) return []
+                    return [
+                      <Table.Row themeOverride={noFill} key={`g-${g}`}>
+                        <Table.Cell themeOverride={noFill}><Text weight="bold">{g} ({items.length})</Text></Table.Cell>
+                        <Table.Cell themeOverride={noFill} />
+                      </Table.Row>,
+                      ...items.map((x) => (
+                        <Table.Row themeOverride={noFill} key={`${g}-${x.title}`}>
+                          <Table.Cell themeOverride={noFill}>{x.title}</Table.Cell>
+                          <Table.Cell themeOverride={noFill}>{x.detail}</Table.Cell>
+                        </Table.Row>
+                      )),
+                    ]
+                  })}
+                </Table.Body>
+              </Table>
+            </section>
+          </Tabs.Panel>
+          <Tabs.Panel id="tab-history" renderTitle={`Copy history (${summary.history.length})`} isSelected={tab === 2} padding="general.spaceXl 0 0 0">
+      <section aria-labelledby="history" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+          <Text as="div" weight="bold" size="large" id="history">Copy history</Text>
+          <Text as="div" color="secondary">A record of this copy. Visible to everyone on the course and your admin.</Text>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'flex-end' }}>
+          <div style={{ width: '20rem', maxWidth: '100%' }}>
+            <TextInput
+              renderLabel={<Text weight="bold">Search history</Text>}
+              placeholder="Activity, type or user"
+              renderBeforeInput={<IconSearchLine />}
+              value={query}
+              onChange={(_e, value) => { setQuery(value); setPage(1) }}
+            />
+          </div>
+          <div style={{ width: '12rem', maxWidth: '100%' }}>
+            <SimpleSelect
+              renderLabel={<Text weight="bold">Type</Text>}
+              value={typeFilter}
+              onChange={(_e, { value }) => { setTypeFilter(String(value)); setPage(1) }}
+            >
+              {TYPE_FILTERS.map(([id, label]) => (
+                <SimpleSelect.Option key={id} id={`history-type-${id}`} value={id}>{label}</SimpleSelect.Option>
+              ))}
+            </SimpleSelect>
+          </div>
+          <div style={{ width: '14rem', maxWidth: '100%' }}>
+            <AutoSelect
+              label="User"
+              assistiveText="Type to find a user. Use the up and down arrow keys to choose."
+              noMatch="No user matches"
+              options={PERSON_FILTERS.map(([id, label]) => ({ id, label }))}
+              value={personFilter}
+              onChange={(id) => { setPersonFilter(id); setPage(1) }}
+            />
+          </div>
+          <div style={{ marginInlineStart: 'auto' }}>
             <Button renderIcon={<IconExportLine />} onClick={() => exportHistory(history, summary.course)}>
               Export history
             </Button>
           </div>
         </div>
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {history.map((h, i) => (
-            <li
-              key={`${h.when}-${i}`}
-              style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, padding: `${t.space.md} 0`, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}
-            >
-              <span style={{ flex: '0 0 11rem' }}><Text color="secondary">{h.when}</Text></span>
-              <span style={{ flex: '1 1 18rem', minWidth: 0 }}>
-                <StatusPill size="xs" color={TAG_COLOR[h.tag]}>{h.tag}</StatusPill> <Text>{h.text}</Text>
-                <Text as="div" size="small" color="secondary">{h.who}</Text>
-              </span>
-              {h.link && <Link href="#" onClick={(e: { preventDefault: () => void }) => e.preventDefault()}>{h.link}</Link>}
-            </li>
-          ))}
-        </ul>
+        <Table caption={() => 'Copy history'} themeOverride={noFill}>
+          <Table.Head themeOverride={noFill}>
+            <Table.Row themeOverride={noFill}>
+              <Table.ColHeader themeOverride={noFill} id="h-when" width="20%">Date and time</Table.ColHeader>
+              <Table.ColHeader themeOverride={noFill} id="h-type" width="12%">Type</Table.ColHeader>
+              <Table.ColHeader themeOverride={noFill} id="h-what">Activity</Table.ColHeader>
+              <Table.ColHeader themeOverride={noFill} id="h-who" width="20%">User</Table.ColHeader>
+            </Table.Row>
+          </Table.Head>
+          <Table.Body themeOverride={noFill}>
+            {history.length === 0 && (
+              <Table.Row themeOverride={noFill}>
+                <Table.Cell themeOverride={noFill} colSpan={4}>No history entries match.</Table.Cell>
+              </Table.Row>
+            )}
+            {pageRows.map((h, i) => (
+              <Table.Row themeOverride={noFill} key={`${h.when}-${i}`}>
+                <Table.Cell themeOverride={noFill}>{h.when}</Table.Cell>
+                <Table.Cell themeOverride={noFill}><StatusPill size="xs" color={TAG_COLOR[h.tag]}>{h.tag}</StatusPill></Table.Cell>
+                <Table.Cell themeOverride={noFill}>{h.text}</Table.Cell>
+                <Table.Cell themeOverride={noFill}>{h.who}</Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+        {pager}
       </section>
-
-      <Modal open={confirmUndo} onDismiss={() => setConfirmUndo(false)} size="small" label="Undo the whole copy" shouldCloseOnDocumentClick={false}>
-        <Modal.Header>
-          <CloseButton placement="end" offset="small" onClick={() => setConfirmUndo(false)} screenReaderLabel="Close" />
-          <Heading level="h2">Undo the whole copy?</Heading>
-        </Modal.Header>
-        <Modal.Body>
-          <Text as="p">
-            This removes everything the copy created in {summary.target}. The course goes back to empty. Your choices are kept, so you can copy again.
-          </Text>
-        </Modal.Body>
-        <Modal.Footer>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <Button onClick={() => setConfirmUndo(false)}>Cancel</Button>
-            <Button color="danger" onClick={() => { setUndone(true); setConfirmUndo(false); onUndo?.() }}>Yes, undo it</Button>
+          </Tabs.Panel>
+        </Tabs>
+      ) : (
+      <section aria-labelledby="history" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+          <Text as="div" weight="bold" size="large" id="history">Copy history</Text>
+          <Text as="div" color="secondary">A record of this copy. Visible to everyone on the course and your admin.</Text>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'flex-end' }}>
+          <div style={{ width: '20rem', maxWidth: '100%' }}>
+            <TextInput
+              renderLabel={<Text weight="bold">Search history</Text>}
+              placeholder="Activity, type or user"
+              renderBeforeInput={<IconSearchLine />}
+              value={query}
+              onChange={(_e, value) => { setQuery(value); setPage(1) }}
+            />
           </div>
-        </Modal.Footer>
-      </Modal>
+          <div style={{ width: '12rem', maxWidth: '100%' }}>
+            <SimpleSelect
+              renderLabel={<Text weight="bold">Type</Text>}
+              value={typeFilter}
+              onChange={(_e, { value }) => { setTypeFilter(String(value)); setPage(1) }}
+            >
+              {TYPE_FILTERS.map(([id, label]) => (
+                <SimpleSelect.Option key={id} id={`history-type-${id}`} value={id}>{label}</SimpleSelect.Option>
+              ))}
+            </SimpleSelect>
+          </div>
+          <div style={{ width: '14rem', maxWidth: '100%' }}>
+            <AutoSelect
+              label="User"
+              assistiveText="Type to find a user. Use the up and down arrow keys to choose."
+              noMatch="No user matches"
+              options={PERSON_FILTERS.map(([id, label]) => ({ id, label }))}
+              value={personFilter}
+              onChange={(id) => { setPersonFilter(id); setPage(1) }}
+            />
+          </div>
+          <div style={{ marginInlineStart: 'auto' }}>
+            <Button renderIcon={<IconExportLine />} onClick={() => exportHistory(history, summary.course)}>
+              Export history
+            </Button>
+          </div>
+        </div>
+        <Table caption={() => 'Copy history'} themeOverride={noFill}>
+          <Table.Head themeOverride={noFill}>
+            <Table.Row themeOverride={noFill}>
+              <Table.ColHeader themeOverride={noFill} id="h-when" width="20%">Date and time</Table.ColHeader>
+              <Table.ColHeader themeOverride={noFill} id="h-type" width="12%">Type</Table.ColHeader>
+              <Table.ColHeader themeOverride={noFill} id="h-what">Activity</Table.ColHeader>
+              <Table.ColHeader themeOverride={noFill} id="h-who" width="20%">User</Table.ColHeader>
+            </Table.Row>
+          </Table.Head>
+          <Table.Body themeOverride={noFill}>
+            {history.length === 0 && (
+              <Table.Row themeOverride={noFill}>
+                <Table.Cell themeOverride={noFill} colSpan={4}>No history entries match.</Table.Cell>
+              </Table.Row>
+            )}
+            {pageRows.map((h, i) => (
+              <Table.Row themeOverride={noFill} key={`${h.when}-${i}`}>
+                <Table.Cell themeOverride={noFill}>{h.when}</Table.Cell>
+                <Table.Cell themeOverride={noFill}><StatusPill size="xs" color={TAG_COLOR[h.tag]}>{h.tag}</StatusPill></Table.Cell>
+                <Table.Cell themeOverride={noFill}>{h.text}</Table.Cell>
+                <Table.Cell themeOverride={noFill}>{h.who}</Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+        {pager}
+      </section>
+      )}
+
     </div>
   )
 }

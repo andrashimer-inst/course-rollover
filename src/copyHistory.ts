@@ -12,10 +12,10 @@ export const PEOPLE = [...EDUCATORS, ADMIN]
 
 export function buildHistory(args: { rows: ReviewRow[]; choices: Record<string, Choice>; opens: string }): HistoryEvent[] {
   const { rows, choices, opens } = args
-  const made = rows.filter((r) => !r.courseWide && choiceOf(r, choices) !== 'leave')
+  const made = rows.filter((r) => !r.courseWide && !r.extra && choiceOf(r, choices) !== 'leave')
   const events: Omit<HistoryEvent, 'when'>[] = []
 
-  events.push({ tag: 'Session', text: `Copy finished. Nothing is published until the course opens (${opens}).`, who: CANVAS })
+  events.push({ tag: 'Session', text: `Copy finished. The course stays unpublished until ${opens}.`, who: CANVAS })
   for (const r of [...made].reverse()) {
     events.push({ tag: 'Created', text: `${r.title} (${r.kindLabel}) created in ${r.group}`, who: CANVAS, link: 'Open' })
   }
@@ -30,7 +30,7 @@ export function buildHistory(args: { rows: ReviewRow[]; choices: Record<string, 
     { tag: 'Session', text: 'Copy started', who: EDUCATORS[1] },
     { tag: 'Session', text: 'Dates checked and fixed', who: EDUCATORS[2] },
     { tag: 'Session', text: 'Learning object review finished', who: EDUCATORS[0] },
-    { tag: 'Session', text: 'Copy wizard opened from Portfolio Test', who: EDUCATORS[0] },
+    { tag: 'Session', text: 'Copy wizard opened from Design Portfolio', who: EDUCATORS[0] },
   )
   let n = 0
   for (const r of rows) {

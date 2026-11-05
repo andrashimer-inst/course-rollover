@@ -27,7 +27,7 @@ export default function App() {
   const onNavigate = (label: string) => {
     if (label === 'Account') setScreen((s) => (s === 'rollover' ? 'assignments' : 'rollover'))
   }
-  // The course menu of the notebook course (Portfolio Test). Settings goes back to Import Content.
+  // The course menu of the notebook course (Design Portfolio). Settings goes back to Import Content.
   const onSelectMenu = (label: string) => {
     if (label === 'Pages') setScreen('page')
     else if (label === 'Assignments') setScreen('assignments')

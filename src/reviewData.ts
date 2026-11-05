@@ -7,19 +7,21 @@ import type { Picked, Scope } from './contentHelpers'
 import type { EducatorComment } from './rolloverData'
 
 // Sample data for the "Learning object review" step. Everything here is made up.
-// Each learning object that comes over is checked against the course design rules (the same rules as the
+// Each learning object that is copied is checked against the course design rules (the same rules as the
 // "Course Design Rule definitions" sheet) and against the comments the teaching team left. Where something is
 // found, the row gets a suggestion with the reason from the sheet, plus an AI suggestion to bring it or not.
 
-export type Choice = 'bring' | 'fix' | 'aifix' | 'leave'
+// aifix: apply the AI fix. aicheck: apply it and put a check of it on the to-do list.
+export type Choice = 'bring' | 'fix' | 'aifix' | 'aicheck' | 'leave'
 
 export const CHOICE_LABEL: Record<Choice, string> = {
-  bring: 'Bring it',
-  fix: 'Bring, fix later',
-  aifix: 'Use AI fix',
-  leave: 'Leave it out',
+  bring: 'Keep',
+  fix: 'Keep, fix later',
+  aifix: 'Keep with AI fix',
+  aicheck: 'Keep with AI fix, review later',
+  leave: 'Leave out',
 }
-export const CHOICES: Choice[] = ['bring', 'fix', 'aifix', 'leave']
+export const CHOICES: Choice[] = ['bring', 'fix', 'aifix', 'aicheck', 'leave']
 
 // What each choice is called on a row, when the usual wording does not fit.
 export type ChoiceLabels = Partial<Record<Choice, string>>
@@ -28,6 +30,10 @@ export type Finding = { rule: DesignRule; detail: string }
 
 export type ReviewRow = {
   id: string
+  // An item with several findings has one row for each. The first row keeps the item's own id, the others add a number.
+  itemId?: string
+  extra?: boolean
+  siblings?: string[]
   title: string
   kindLabel: string
   typeId: TypeId | 'course'
@@ -64,17 +70,41 @@ const KIND_LABEL: Record<TypeId, string> = {
 
 // Where the design check found something, by item id. The detail is why this item was flagged.
 const HITS: Record<string, { rule: string; detail: string }[]> = {
+  'assignments:1': [{ rule: 'links', detail: 'The reading link points to last year’s course and will not open for students in the new term.' }],
   'assignments:5': [{ rule: 'deliverables', detail: "No clear deliverable is specified. The text 'Show us what you built' does not say what students need to submit." }],
   'assignments:4': [
     { rule: 'deliverables', detail: 'The description names no format, length or number of reviews, so students cannot tell what a finished peer review looks like.' },
     { rule: 'due-dates', detail: 'This assignment has no due date.' },
   ],
   'assignments:2': [{ rule: 'deliverables-2', detail: 'The description gives a length but not a file format or a submission type.' }],
+  'quizzes:3': [{ rule: 'unused', detail: 'This quiz was never published last term, so no student has taken it.' }],
   'discussions:1': [{ rule: 'due-dates', detail: 'This discussion has no due date.' }],
-  'pages:1': [{ rule: 'summary', detail: 'The page has an introduction and office hours, but no policies on late work or academic integrity.' }],
-  'pages:4': [{ rule: 'links', detail: 'A link to the case study video points to the previous course and will not open for students in the new term.' }],
-  'announcements:1': [{ rule: 'communication', detail: 'This is one of two announcements, both from the start of the term.' }],
+  'discussions:3': [{ rule: 'unused', detail: 'No student posted in this discussion last term.' }],
+  'pages:1': [
+    { rule: 'summary', detail: 'The page has an introduction and office hours, but no policies on late work or academic integrity.' },
+    { rule: 'alt-text', detail: '3 images on this page have no alt text.' },
+  ],
+  'pages:2': [
+    { rule: 'links', detail: 'A link to the 2023 reading list goes to a page that no longer exists.' },
+    { rule: 'alt-text', detail: '2 images on this page have no alt text.' },
+  ],
+  'pages:3': [{ rule: 'links', detail: 'Two links point to the old submission guide from the previous course.' }],
+  'pages:4': [
+    { rule: 'links', detail: 'A link to the case study video points to the previous course and will not open for students in the new term.' },
+    { rule: 'alt-text', detail: '4 images on this page have no alt text.' },
+  ],
+  'announcements:1': [
+    { rule: 'communication', detail: 'This is one of two announcements, both from the start of the term.' },
+    { rule: 'links', detail: 'The link to the welcome video points to the previous course.' },
+  ],
+  'announcements:2': [{ rule: 'unused', detail: 'This announcement is about a guest talk from last term, and no student opened it this year.' }],
+  'announcements:3': [{ rule: 'unused', detail: 'It reminds students of a quiz date from last term.' }],
+  'announcements:4': [{ rule: 'unused', detail: 'The new office hours are already on the welcome page, so nobody needs this notice.' }],
+  'files:3': [{ rule: 'unused', detail: 'No student opened this file last term.' }],
+  'files:5': [{ rule: 'unused', detail: 'This 2023 file is in an old format, and no student opened it last term.' }],
+  'files:6': [{ rule: 'alt-text', detail: '6 images in these slides have no alt text.' }],
   'files:7': [{ rule: 'captions', detail: 'This 4 minute video has no captions or transcript.' }],
+  'events:2': [{ rule: 'unused', detail: 'The date is from last term and the event has no description.' }],
   syllabus: [
     { rule: 'feedback-timeline', detail: 'The syllabus does not say when students can expect feedback on their work.' },
     { rule: 'syllabus-objectives', detail: 'No course-level learning objectives are stated. They appear only on the welcome page.' },
@@ -82,16 +112,27 @@ const HITS: Record<string, { rule: string; detail: string }[]> = {
 }
 
 // Quick fixes the AI offers, by item id. The text is made up.
+// A key is the item id (when the item has one finding) or "item id|rule" (when it has several).
 const FIXES: Record<string, { what: string; after: string }> = {
+  'assignments:1': { what: 'Swaps the reading link for this term’s version', after: 'Reading 1 (this term).' },
   'assignments:5': { what: 'Adds a clear deliverable to the description', after: 'Upload one PDF with your four portfolio projects. Add a note of 100 words or less for each project.' },
-  'assignments:4': { what: 'A shorter description with the format and length', after: 'Review two classmates’ outlines. Write 150 words for each and post them as replies by Friday.' },
+  'assignments:4|deliverables': { what: 'A shorter description with the format and length', after: 'Review two classmates’ outlines. Write 150 words for each and post them as replies by Friday.' },
+  'assignments:4|due-dates': { what: 'Sets a due date in week 6', after: 'Due Friday of week 6, 11:59 PM.' },
   'assignments:2': { what: 'Adds the file format to the description', after: 'Upload a one-page PDF with your audience, your main goal and the tools you expect to use.' },
   'discussions:1': { what: 'A clearer, shorter prompt', after: 'Share your name, your goal for this course and one design you admire. Reply to two classmates.' },
-  'pages:1': { what: 'Adds a short policy section', after: 'Late work loses 10% a day. Cite your sources and hand in your own work.' },
-  'pages:4': { what: 'Swaps the old video link for the current one', after: 'Case study video (this term)' },
-  'announcements:1': { what: 'A shorter version of the announcement', after: 'Welcome! The first module is open. Start with the welcome page.' },
+  'pages:1|summary': { what: 'Adds a short policy section', after: 'Late work loses 10% a day. Cite your sources and hand in your own work.' },
+  'pages:1|alt-text': { what: 'Writes alt text for 3 images', after: 'Each image gets a short description of what it shows.' },
+  'pages:2|links': { what: 'Swaps the old reading list for the current one', after: 'Reading list (this term).' },
+  'pages:2|alt-text': { what: 'Writes alt text for 2 images', after: 'Each image gets a short description of what it shows.' },
+  'pages:3': { what: 'Swaps both links for the current submission guide', after: 'How to submit your work (this term).' },
+  'pages:4|links': { what: 'Swaps the old video link for the current one', after: 'Case study video (this term)' },
+  'pages:4|alt-text': { what: 'Writes alt text for 4 images', after: 'Each image gets a short description of what it shows.' },
+  'announcements:1|communication': { what: 'A shorter version of the announcement', after: 'Welcome! The first module is open. Start with the welcome page.' },
+  'announcements:1|links': { what: 'Swaps the video link for this term’s version', after: 'Welcome video (this term).' },
+  'files:6': { what: 'Writes alt text for 6 images', after: 'Each image in the slides gets a short description of what it shows.' },
   'files:7': { what: 'Generates English captions for the video', after: 'Captions for all 4 minutes, ready to read through after the copy.' },
-  syllabus: { what: 'Adds the feedback timeline and course objectives', after: 'You get feedback on every assignment within 7 days. By the end of the course you can present a project to a client.' },
+  'syllabus|feedback-timeline': { what: 'Adds the feedback timeline', after: 'You get feedback on every assignment within 7 days.' },
+  'syllabus|syllabus-objectives': { what: 'Adds the course objectives', after: 'By the end of the course you can present a project to a client.' },
 }
 
 // Checks that affect accessibility and outcomes. They are not in the sheet: the prototype adds them next to its rules.
@@ -102,6 +143,13 @@ export const EXTRA_RULES: DesignRule[] = [
     severity: 'critical',
     title: 'Videos should have captions.',
     why: 'Captions let students who are deaf, hard of hearing or in a noisy room follow the video.',
+  },
+  {
+    id: 'unused',
+    dimension: 'Instructional Materials',
+    severity: 'warning',
+    title: 'Items nobody used should stay behind.',
+    why: 'A shorter course is easier for students to find their way in, and unused items add clutter and things to maintain.',
   },
   {
     id: 'alt-text',
@@ -132,13 +180,16 @@ const sameItem = (comment: string, title: string) => comment === title || commen
 
 function aiFor(findings: Finding[], note?: EducatorComment): ReviewRow['ai'] {
   if (note?.decision === 'leave-out') {
-    return { choice: 'leave', reason: 'Your team says it was not used or is replaced, so there is little reason to bring it.' }
+    return { choice: 'leave', reason: 'Your team says it was not used or is replaced, so there is little reason to copy it.' }
+  }
+  if (findings.some((f) => f.rule.id === 'unused')) {
+    return { choice: 'leave', reason: 'Nobody used it last term, so there is little reason to copy it.' }
   }
   if (findings.some((f) => f.rule.severity === 'critical')) {
-    return { choice: 'fix', reason: 'Students will run into this early in the term. It is quicker to bring it and fix the detail than to write it again.' }
+    return { choice: 'fix', reason: 'Students will run into this early in the term. It is quicker to copy it and fix the detail than to write it again.' }
   }
   if (note?.decision === 'fix-later' || findings.length > 0) {
-    return { choice: 'fix', reason: 'The issue is small and easy to fix after the copy, so bringing it saves you the setup.' }
+    return { choice: 'fix', reason: 'The issue is small and easy to fix after the copy, so copying it saves you the setup.' }
   }
   if (note?.decision === 'copy') {
     return { choice: 'bring', reason: 'Your team says it worked well last term.' }
@@ -146,7 +197,7 @@ function aiFor(findings: Finding[], note?: EducatorComment): ReviewRow['ai'] {
   return undefined
 }
 
-// The rows that come over, in the order of the course. Items in a module sit under that module.
+// The rows that are copied, in the order of the course. Items in a module sit under that module.
 export function buildRows(scope: Scope, picked: Picked, comments: EducatorComment[]): ReviewRow[] {
   const eff = withPulledIn(picked)
   const moduleOf: Record<string, string> = {}
@@ -159,20 +210,30 @@ export function buildRows(scope: Scope, picked: Picked, comments: EducatorCommen
     const items = type.items.length ? type.items : [{ id: type.id, label: type.label }]
     for (const item of items) {
       if (scope === 'part' && !eff[item.id]) continue
-      const findings = (HITS[item.id] ?? []).map((h) => ({ rule: rule(h.rule), detail: h.detail }))
+      const all = (HITS[item.id] ?? []).map((h) => ({ rule: rule(h.rule), detail: h.detail }))
       const note = comments.find((c) => sameItem(c.item, item.label))
-      const ai = aiFor(findings, note)
-      rows.push({
-        id: item.id,
-        title: item.label,
-        kindLabel: KIND_LABEL[type.id],
-        typeId: type.id,
-        group: moduleOf[item.id] ?? (type.id === 'settings' || type.id === 'syllabus' ? 'Course' : type.label),
-        findings,
-        note,
-        ai,
-        aiFix: ai ? FIXES[item.id] : undefined,
-        hasSuggestion: !!ai,
+      // An item with several findings gets a row for each, so every finding has its own fix and its own choice.
+      const parts = all.length > 1 ? all.map((f) => [f]) : [all]
+      const ids = parts.map((_, n) => (n === 0 ? item.id : `${item.id}#${n + 1}`))
+      parts.forEach((findings, n) => {
+        const rowNote = n === 0 ? note : undefined
+        const ai = aiFor(findings, rowNote)
+        const fix = all.length > 1 ? FIXES[`${item.id}|${findings[0].rule.id}`] : FIXES[item.id]
+        rows.push({
+          id: ids[n],
+          itemId: item.id,
+          extra: n > 0,
+          siblings: ids,
+          title: item.label,
+          kindLabel: KIND_LABEL[type.id],
+          typeId: type.id,
+          group: moduleOf[item.id] ?? (type.id === 'settings' || type.id === 'syllabus' ? 'Course' : type.label),
+          findings,
+          note: rowNote,
+          ai,
+          aiFix: ai ? fix : undefined,
+          hasSuggestion: !!ai,
+        })
       })
     }
   }
@@ -247,7 +308,7 @@ function courseRow(c: (typeof COURSE_ROWS)[number]): ReviewRow {
     group: 'Whole course',
     courseWide: true,
     options: ['bring', 'fix', 'aifix'],
-    labels: { bring: 'Keep it as it is', fix: 'Fix it after the copy' },
+    labels: { bring: 'Keep', fix: 'Fix after the copy' },
     findings: [{ rule: rule(c.rule), detail: c.detail }],
     ai: { choice: 'aifix', reason: c.reason },
     aiFix: c.fix,
@@ -257,8 +318,12 @@ function courseRow(c: (typeof COURSE_ROWS)[number]): ReviewRow {
 
 export const choiceLabel = (row: ReviewRow, c: Choice) => row.labels?.[c] ?? CHOICE_LABEL[c]
 
+// Leaving out is for the whole item: if any row of the item is left out, all its rows are.
 export const choiceOf = (row: ReviewRow, choices: Record<string, Choice>): Choice | undefined =>
-  choices[row.id] ?? (row.hasSuggestion ? undefined : 'bring')
+  row.siblings?.some((id) => choices[id] === 'leave') ? 'leave' : choices[row.id] ?? (row.hasSuggestion ? undefined : 'bring')
+
+// The id of the learning object a row is about. Rows of one item share it.
+export const itemIdOf = (row: ReviewRow) => row.itemId ?? row.id
 
 // ---- Modules that exist in both courses --------------------------------------------------------------
 // Merging brings modules next to the ones already in the course. These pairs look like the same module twice.
@@ -317,6 +382,7 @@ export const RULE_LABEL: Record<string, string> = {
   'alt-text': 'Missing alt text',
   contrast: 'Hard to read',
   'rubric-outcomes': 'No linked outcomes',
+  unused: 'Not used',
 }
 
 // The same for what the teaching team wrote, by comment id.

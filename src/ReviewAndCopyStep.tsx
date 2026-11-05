@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Checkbox, IconCheckMarkSolid, RadioInput, Spinner, Text } from '@instructure/ui/v11_7'
+import { Button, Checkbox, DateInput, IconArrowOpenDownSolid, IconArrowOpenEndSolid, IconArrowOpenUpSolid, IconAssignmentLine, IconCheckMarkSolid, SimpleSelect, Tabs, RadioInput, Spinner, Text } from '@instructure/ui/v11_7'
 import StatusPill from './StatusPill'
 import { CoursePreview } from './ContentStep'
-import { CONTENT_TYPES } from './courseContentData'
+import { CONTENT_TYPES, MODULE_ENTRIES } from './courseContentData'
 import type { CopyMode, Picked, Scope } from './contentHelpers'
-import { OPENING_TIME, STATUS_LABEL, dimensionsOf, readiness } from './reviewCopyData'
+import { STATUS_LABEL, dimensionsOf, openingLabel, readiness } from './reviewCopyData'
 import type { Opening } from './reviewCopyData'
 import type { ReadyStatus } from './reviewCopyData'
-import { choiceOf, hiddenModules } from './reviewData'
+import { choiceLabel, choiceOf, hiddenModules, itemIdOf } from './reviewData'
 import type { Choice, DupeChoice, ReviewRow } from './reviewData'
 import { DATE_ITEMS, rowInfo } from './fixDatesData'
 import type { FixDatesState } from './fixDatesData'
@@ -27,10 +27,22 @@ const STATUS_PILL: Record<ReadyStatus, 'success' | 'warning' | 'error'> = {
   manual: 'error',
 }
 
+// The viewer's own time zone, like "GMT+2". The publish time is always in it.
+const LOCAL_ZONE = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value ?? 'your time zone'
+
+// Every half hour of the day, for the publish time.
+const TIMES = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2)
+  const m = i % 2 === 0 ? 0 : 30
+  const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  const label = new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return { value, label }
+})
+
 const MODULES = CONTENT_TYPES.find((c) => c.id === 'modules')!.items
 
 export default function ReviewAndCopyStep({
-  rows, choices, scope, mode, picked, dupes, dates, readyRan, setReadyRan, opening, setOpening,
+  rows, choices, scope, mode, picked, dupes, dates, readyRan, setReadyRan, opening, setOpening, todoCount, onToggleTodo,
 }: {
   rows: ReviewRow[]
   choices: Record<string, Choice>
@@ -43,6 +55,9 @@ export default function ReviewAndCopyStep({
   setReadyRan: (v: boolean) => void
   opening: Opening
   setOpening: (o: Opening) => void
+  // The to-do list so far, which opens beside the page.
+  todoCount: number
+  onToggleTodo: () => void
 }) {
   const t = useSurfaceTokens()
   const card = useAppThemeKey() !== 'legacy'
@@ -50,6 +65,9 @@ export default function ReviewAndCopyStep({
     ? { background: t.containerColor, borderRadius: t.radiusCardMd, boxShadow: t.shadowResting, padding: t.space.lg }
     : undefined
 
+  const [tab, setTab] = useState(0)
+  // The groups of the learning objects tab open and close like an accordion. They start open.
+  const [closedGroups, setClosedGroups] = useState<string[]>([])
   const ready = useMemo(() => readiness(rows, choices), [rows, choices])
   const groups = useMemo(() => dimensionsOf(ready), [ready])
 
@@ -74,14 +92,17 @@ export default function ReviewAndCopyStep({
     setRunning(true)
   }
 
-  const count = (s: ReadyStatus) => ready.filter((r) => r.status === s).length
-  const readyCount = count('pass') + count('fixed')
+  // The check starts by itself when the step opens, unless it already ran.
+  useEffect(() => {
+    if (!readyRan) run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
 
   // What the choices of steps 2 and 3 changed, for the notes and the preview.
-  const leftOut = rows.filter((r) => choiceOf(r, choices) === 'leave')
-  const aiFixed = rows.filter((r) => choiceOf(r, choices) === 'aifix')
+  const leftOut = rows.filter((r) => !r.extra && choiceOf(r, choices) === 'leave')
+  const aiFixed = rows.filter((r) => ['aifix', 'aicheck'].includes(choiceOf(r, choices) as string))
   const fixLater = rows.filter((r) => choiceOf(r, choices) === 'fix')
-  const hiddenItems = new Set(leftOut.map((r) => r.id))
   const moduleIds = scope === 'whole' ? MODULES.map((m) => m.id) : MODULES.filter((m) => picked[m.id]).map((m) => m.id)
   const merging = scope === 'part' && mode === 'merge'
   const movedDates = DATE_ITEMS.filter((item) => {
@@ -89,173 +110,296 @@ export default function ReviewAndCopyStep({
     return info.final && info.final.toDateString() !== info.base.toDateString()
   }).length
 
+  // A summary of the choices made, one line for each area.
   const changes: string[] = [
     scope === 'whole'
-      ? `The whole course comes over (${MODULES.length} modules and all learning objects). It replaces what is in this course now.`
-      : `Part of the course comes over: ${moduleIds.length} of ${MODULES.length} modules. It ${merging ? 'is merged with the current course' : 'replaces the current course'}.`,
-    leftOut.length ? `${leftOut.length} ${leftOut.length === 1 ? 'item is' : 'items are'} left out: ${leftOut.map((r) => r.title).join(', ')}.` : 'Nothing is left out.',
-    aiFixed.length ? `${aiFixed.length} AI ${aiFixed.length === 1 ? 'fix is' : 'fixes are'} applied while copying.` : 'No AI fixes are applied.',
-    fixLater.length ? `${fixLater.length} ${fixLater.length === 1 ? 'item comes' : 'items come'} over as they are and ${fixLater.length === 1 ? 'is' : 'are'} on your to-do list to fix.` : 'No items are waiting to be fixed after the copy.',
+      ? `Scope: the whole course (${MODULES.length} modules and all learning objects). It replaces the current content.`
+      : `Scope: ${moduleIds.length} of ${MODULES.length} modules. ${merging ? 'They are merged with the current content.' : 'They replace the current content.'}`,
+    leftOut.length ? `Left out: ${leftOut.length} ${leftOut.length === 1 ? 'item' : 'items'} (${leftOut.map((r) => r.title).join(', ')}).` : 'Left out: nothing.',
+    aiFixed.length ? `AI fixes: ${aiFixed.length} applied during the copy.` : 'AI fixes: none applied.',
+    fixLater.length ? `To fix after the copy: ${fixLater.length} ${fixLater.length === 1 ? 'item' : 'items'}, on your to-do list.` : 'To fix after the copy: nothing.',
     dates.mode === 'clear'
-      ? 'All dates are cleared. You set them later.'
-      : `Dates move to the new term${movedDates ? `, and ${movedDates} ${movedDates === 1 ? 'was' : 'were'} changed by you` : ''}.`,
+      ? 'Dates: cleared. Set them after the copy.'
+      : `Dates: moved to the new term${movedDates ? `, ${movedDates} changed by you` : ''}.`,
     opening.mode === 'open'
-      ? `Students see the course on ${OPENING_TIME}${opening.hold ? ', unless a required check still fails that day' : ''}.`
-      : 'The course stays unpublished until you open it yourself.',
+      ? `Publishing: ${openingLabel(opening)}${opening.hold ? ', unless a required check still fails that day' : ''}.`
+      : 'Publishing: manual. The course stays unpublished until you publish it.',
   ]
+
+  // Each item shows the decision made for it in the review, the same pills as in the learning object review.
+  // The learning objects copied on their own (not in a module), grouped by type, with the decisions made for each.
+  const inModule = new Set(Object.values(MODULE_ENTRIES).flatMap((es) => es.map((e) => e.itemId)))
+  const pillColor = (c: Choice) => (c === 'aifix' || c === 'aicheck' ? 'ai' : c === 'fix' ? 'warning' : c === 'leave' ? 'error' : 'success') as 'ai' | 'warning' | 'error' | 'success'
+  const objectItems = [...new Set(rows.filter((r) => !r.courseWide && !inModule.has(itemIdOf(r))).map((r) => itemIdOf(r)))].map((id) => {
+    const own = rows.filter((r) => itemIdOf(r) === id)
+    const first = own[0]
+    const decisions = own
+      .map((r) => choiceOf(r, choices))
+      .filter((c): c is Choice => c !== undefined)
+      .filter((c, n, all) => all.indexOf(c) === n)
+      .map((c) => ({ label: choiceLabel(first, c), color: pillColor(c) }))
+    return { id, title: first.title, kind: first.kindLabel, group: first.group, decisions, left: decisions.some((d) => d.color === 'error') }
+  })
+  const objectCopied = objectItems.filter((i) => !i.left).length
+  const objectGroups = [...new Set(objectItems.map((i) => i.group))].map((g) => [g, objectItems.filter((i) => i.group === g)] as const)
 
   const noteFor = (itemId: string): ReactNode => {
     const row = rows.find((r) => r.id === itemId)
     const c = row ? choiceOf(row, choices) : undefined
-    if (c === 'aifix') return <StatusPill size="xs" color="ai">AI fix applied</StatusPill>
-    if (c === 'fix') return <StatusPill size="xs" color="warning">Fix after the copy</StatusPill>
-    return null
+    if (!row || !c) return null
+    return (
+      <StatusPill size="xs" color={c === 'aifix' || c === 'aicheck' ? 'ai' : c === 'fix' ? 'warning' : c === 'leave' ? 'error' : 'success'}>
+        {choiceLabel(row, c)}
+      </StatusPill>
+    )
   }
 
-  const section = (title: string, body: ReactNode, action?: ReactNode, note?: string) => (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: t.space.md }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <Text as="div" weight="bold" size="large">{title}</Text>
-          {note && <Text as="div" color="secondary">{note}</Text>}
-        </div>
-        {action}
-      </div>
-      {body}
-    </section>
-  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.xxl }}>
-      {section(
-        'Course readiness check',
-        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
-          {running && (
-            <div role="status" style={cardStyle}>
-              <Text as="div" color="secondary">This can take some time. Keep this page open.</Text>
-              <ul style={{ listStyle: 'none', margin: `${t.space.md} 0 0`, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(15rem, 1fr))', gap: t.space.md }}>
-                {groups.map((g, i) => (
-                  <li key={g.dimension} style={{ display: 'flex', alignItems: 'center', gap: t.space.md, opacity: i <= doneAreas ? 1 : 0.5 }}>
-                    <span style={{ display: 'inline-flex', width: '1.5rem', color: t.successTextColor }}>
-                      {i < doneAreas ? <IconCheckMarkSolid /> : i === doneAreas ? <Spinner renderTitle={`Checking ${g.dimension}`} size="x-small" /> : null}
-                    </span>
-                    <span>
-                      <Text as="div" weight="bold">{g.dimension}</Text>
-                      <Text as="div" size="small" color="secondary">{i < doneAreas ? 'Checked' : i === doneAreas ? 'Checking' : 'Waiting'}</Text>
-                    </span>
-                  </li>
+      <Tabs onRequestTabChange={(_e, { index }) => setTab(index)}>
+        <Tabs.Panel id="tab-ready" renderTitle="Course readiness check" isSelected={tab === 0} padding="general.spaceXl 0 0 0">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+            {/* The to-do list button stays on top of the card, under the tabs. */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button renderIcon={<IconAssignmentLine />} onClick={onToggleTodo}>To-do list ({todoCount})</Button>
+            </div>
+          <div style={cardStyle}>
+            {/* Card title and description, with the run button at the end of the row. */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                <Text as="div" weight="bold" size="large">Course readiness check</Text>
+                <Text as="div" color="secondary">The check uses the course design rules and your choices in the review.</Text>
+              </div>
+              <Button color={readyRan ? 'secondary' : 'primary'} interaction={running ? 'disabled' : 'enabled'} onClick={run}>
+                {running ? 'Checking…' : readyRan ? 'Run again' : 'Run readiness check'}
+              </Button>
+            </div>
+            <div style={{ marginTop: t.space.lg }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+                {running && (
+                  <div role="status">
+                    <Text as="div" color="secondary">This can take some time. Keep this page open.</Text>
+                    <ul style={{ listStyle: 'none', margin: `${t.space.md} 0 0`, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(15rem, 1fr))', gap: t.space.md }}>
+                      {groups.map((g, i) => (
+                        <li key={g.dimension} style={{ display: 'flex', alignItems: 'center', gap: t.space.md, opacity: i <= doneAreas ? 1 : 0.5 }}>
+                          <span style={{ display: 'inline-flex', width: '1.5rem', color: t.successTextColor }}>
+                            {i < doneAreas ? <IconCheckMarkSolid /> : i === doneAreas ? <Spinner renderTitle={`Checking ${g.dimension}`} size="x-small" /> : null}
+                          </span>
+                          <span>
+                            <Text as="div" weight="bold">{g.dimension}</Text>
+                            <Text as="div" size="small" color="secondary">{i < doneAreas ? 'Checked' : i === doneAreas ? 'Checking' : 'Waiting'}</Text>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {readyRan && !running && (
+                  <div>
+                    {groups.map((g) => (
+                      <div key={g.dimension} style={{ marginTop: t.space.lg }}>
+                        <div style={{ background: t.pageColor, padding: t.space.md }}>
+                          <Text weight="bold">{g.dimension}</Text>
+                        </div>
+                        {g.rules.map((x) => (
+                          <div
+                            key={x.rule.id}
+                            style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'center', justifyContent: 'space-between', padding: t.space.md, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}
+                          >
+                            <div style={{ flex: '1 1 20rem', minWidth: 0 }}>
+                              <Text as="div" weight="bold">{x.rule.title}</Text>
+                              <Text as="div" color="secondary">{x.note}</Text>
+                            </div>
+                            <StatusPill size="sm" color={STATUS_PILL[x.status]}>{STATUS_LABEL[x.status]}</StatusPill>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!running && !readyRan && (
+                  <Text color="secondary">Run the readiness check to see whether the course is ready for students, based on the choices you made. The check is optional.</Text>
+                )}
+              </div>
+            </div>
+          </div>
+          </div>
+        </Tabs.Panel>
+        <Tabs.Panel id="tab-final" renderTitle="Course preview" isSelected={tab === 1} padding="general.spaceXl 0 0 0">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                <Text as="div" weight="bold" size="large">Copy overview</Text>
+                <Text as="div" color="secondary">A summary of the choices you made in this copy.</Text>
+              </div>
+              <ul style={{ margin: `${t.space.lg} 0 0`, paddingInlineStart: '1.25rem' }}>
+                {changes.map((c) => (
+                  <li key={c}><Text>{c}</Text></li>
                 ))}
               </ul>
             </div>
-          )}
-          {readyRan && !running && (
-            <div style={cardStyle}>
-              <Text as="div" weight="bold">
-                {readyCount} of {ready.length} checks are ready · {count('later')} to fix after the copy · {count('manual')} to do yourself
-              </Text>
-              {groups.map((g) => (
-                <div key={g.dimension} style={{ marginTop: t.space.lg }}>
-                  <div style={{ background: t.pageColor, padding: t.space.md }}>
-                    <Text weight="bold">{g.dimension}</Text>
-                  </div>
-                  {g.rules.map((x) => (
-                    <div
-                      key={x.rule.id}
-                      style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'flex-start', justifyContent: 'space-between', padding: t.space.md, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}
-                    >
-                      <div style={{ flex: '1 1 20rem', minWidth: 0 }}>
-                        <Text as="div" weight="bold">{x.rule.title}</Text>
-                        <Text as="div" color="secondary">{x.note}</Text>
-                      </div>
-                      <StatusPill size="sm" color={STATUS_PILL[x.status]}>{STATUS_LABEL[x.status]}</StatusPill>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-          {!running && !readyRan && (
-            <Text color="secondary">Run the check to see how ready the course is for students, based on the choices you made. You can copy without running it.</Text>
-          )}
-        </div>,
-        <Button color={readyRan ? 'secondary' : 'primary'} interaction={running ? 'disabled' : 'enabled'} onClick={run}>
-          {running ? 'Checking…' : readyRan ? 'Run it again' : 'Run the check'}
-        </Button>,
-        'The check uses the course design rules and your choices in the review.',
-      )}
-
-      {section(
-        'Final preview',
-        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+            <CoursePreview
+              title="Preview"
+              moduleIds={moduleIds}
+              keepCurrent={merging}
+              highlightNew={scope === 'part'}
+              hidden={hiddenModules(dupes)}
+              noteFor={noteFor}
+            />
+          </div>
+        </Tabs.Panel>
+        <Tabs.Panel id="tab-objects" renderTitle="Learning objects" isSelected={tab === 2} padding="general.spaceXl 0 0 0">
+          {/* The learning objects that are copied on their own, outside modules, with the decision made for each in the review. */}
           <div style={cardStyle}>
-            <Text as="div" weight="bold">What changed from your choices</Text>
-            <ul style={{ margin: `${t.space.sm} 0 0`, paddingInlineStart: '1.25rem' }}>
-              {changes.map((c) => (
-                <li key={c}><Text>{c}</Text></li>
-              ))}
-            </ul>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                <Text as="div" weight="bold" size="large">Learning objects</Text>
+                <Text as="div" color="secondary">
+                  {objectCopied} of {objectItems.length} learning objects will be copied.
+                </Text>
+              </div>
+              {objectGroups.length > 0 && (() => {
+                const names = objectGroups.map(([g]) => g)
+                const allClosed = names.every((g) => closedGroups.includes(g))
+                return (
+                  <Button
+                    size="small"
+                    renderIcon={allClosed ? <IconArrowOpenDownSolid /> : <IconArrowOpenUpSolid />}
+                    onClick={() => setClosedGroups(allClosed ? [] : names)}
+                  >
+                    {allClosed ? 'Expand all' : 'Collapse all'}
+                  </Button>
+                )
+              })()}
+            </div>
+            {objectGroups.length === 0 ? (
+              <Text as="p" color="secondary">No learning objects are copied on their own.</Text>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg, marginTop: t.space.lg }}>
+                {objectGroups.map(([group, list]) => {
+                  const closed = closedGroups.includes(group)
+                  return (
+                    <div key={group} style={{ border: `${t.borderWidth} solid ${t.borderColor}`, borderRadius: t.radiusMd, overflow: 'hidden' }}>
+                      <button
+                        type="button"
+                        aria-expanded={!closed}
+                        onClick={() => setClosedGroups(closed ? closedGroups.filter((g) => g !== group) : [...closedGroups, group])}
+                        style={{ all: 'unset', boxSizing: 'border-box', width: '100%', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: t.space.sm, padding: t.space.md, background: t.pageColor, color: t.textColor }}
+                      >
+                        <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                          {closed ? <IconArrowOpenEndSolid /> : <IconArrowOpenDownSolid />}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}><Text weight="bold">{group}</Text></span>
+                        <Text size="small" color="secondary">{list.filter((i) => !i.left).length} of {list.length} copied</Text>
+                      </button>
+                      {!closed &&
+                        list.map((i) => (
+                          <div
+                            key={i.id}
+                            style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'center', justifyContent: 'space-between', padding: t.space.md, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <Text as="div" weight="bold">{i.title}</Text>
+                              <Text as="div" size="small" color="secondary">{i.kind}</Text>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.sm }}>
+                              {i.decisions.map((d) => (
+                                <StatusPill key={d.label} size="xs" color={d.color}>{d.label}</StatusPill>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-          <CoursePreview
-            title="How the course will look after the copy"
-            moduleIds={moduleIds}
-            keepCurrent={merging}
-            highlightNew={scope === 'part'}
-            hidden={hiddenModules(dupes)}
-            hiddenItems={hiddenItems}
-            noteFor={noteFor}
-          />
-        </div>,
-      )}
-
-      {section(
-        'When students see the course',
-        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
-          <div role="radiogroup" aria-label="When students see the course" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: t.space.lg }}>
-            {([
-              ['open', `Open on ${OPENING_TIME}`, 'The first day of term. Students see nothing before then.'],
-              ['self', 'I’ll open it myself', 'The course stays unpublished until you publish it.'],
-            ] as const).map(([id, title, body]) => {
-              const on = opening.mode === id
-              return (
-                <div
-                  key={id}
-                  onClick={() => setOpening({ ...opening, mode: id })}
-                  style={{
-                    flex: '1 1 18rem',
-                    minWidth: 0,
-                    boxSizing: 'border-box',
-                    cursor: 'pointer',
-                    padding: t.space.lg,
-                    borderRadius: t.radiusCardMd,
-                    background: t.containerColor,
-                    boxShadow: t.shadowResting,
-                    border: `${on ? '0.125rem' : t.borderWidth} solid ${on ? t.linkColor : t.borderColor}`,
-                  }}
-                >
-                  <RadioInput
-                    name="opening"
-                    value={id}
-                    checked={on}
-                    onChange={() => setOpening({ ...opening, mode: id })}
-                    label={
-                      <span style={{ display: 'block' }}>
-                        <Text weight="bold">{title}</Text>
-                        <Text as="div" color="secondary">{body}</Text>
-                      </span>
-                    }
-                  />
-                </div>
-              )
-            })}
+        </Tabs.Panel>
+        <Tabs.Panel id="tab-open" renderTitle="Course publish" isSelected={tab === 3} padding="general.spaceXl 0 0 0">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+            <div role="radiogroup" aria-label="Course publish" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: t.space.lg }}>
+              {([
+                ['open', `Publish on ${openingLabel(opening)}`, 'Publishes on the term start date. Hidden from students until then.'],
+                ['self', 'Publish manually', 'The course stays hidden until you publish it.'],
+              ] as const).map(([id, title, body]) => {
+                const on = opening.mode === id
+                return (
+                  <div
+                    key={id}
+                    onClick={() => setOpening({ ...opening, mode: id })}
+                    style={{
+                      flex: '1 1 18rem',
+                      minWidth: 0,
+                      boxSizing: 'border-box',
+                      cursor: 'pointer',
+                      padding: t.space.lg,
+                      borderRadius: t.radiusCardMd,
+                      background: t.containerColor,
+                      boxShadow: t.shadowResting,
+                      border: `${on ? '0.125rem' : t.borderWidth} solid ${on ? t.linkColor : t.borderColor}`,
+                    }}
+                  >
+                    <RadioInput
+                      name="opening"
+                      value={id}
+                      checked={on}
+                      onChange={() => setOpening({ ...opening, mode: id })}
+                      label={
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                          <Text weight="bold">{title}</Text>
+                          <Text as="div" color="secondary">{body}</Text>
+                        </span>
+                      }
+                    />
+                    {/* The day and time of the automatic publish, with the date field of the dates step. */}
+                    {on && id === 'open' && (
+                      <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.md, alignItems: 'flex-start', marginTop: t.space.lg }}>
+                        <div style={{ width: '14rem', maxWidth: '100%' }}>
+                          <DateInput
+                            screenReaderLabels={{
+                              calendarIcon: 'Open calendar',
+                              prevMonthButton: 'Previous month',
+                              nextMonthButton: 'Next month',
+                              datePickerDialog: 'Date picker',
+                              selectedLabel: 'Selected',
+                            }}
+                            width="100%"
+                            placeholder="Select a date"
+                            invalidDateErrorMessage="Enter a valid date"
+                            renderLabel={<Text weight="bold">Publish date</Text>}
+                            value={opening.date}
+                            onChange={(_e, v) => setOpening({ ...opening, date: v })}
+                            messages={Number.isNaN(new Date(opening.date).getTime()) ? [{ type: 'newError', text: 'Enter a valid date' }] : []}
+                          />
+                        </div>
+                        <div style={{ width: '14rem', maxWidth: '100%' }}>
+                          <SimpleSelect
+                            renderLabel={<Text weight="bold">{`Publish time (${LOCAL_ZONE})`}</Text>}
+                            value={opening.time}
+                            onChange={(_e, { value }) => setOpening({ ...opening, time: String(value) })}
+                          >
+                            {TIMES.map((tm) => (
+                              <SimpleSelect.Option key={tm.value} id={`publish-${tm.value}`} value={tm.value}>{tm.label}</SimpleSelect.Option>
+                            ))}
+                          </SimpleSelect>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <Checkbox
+              label="Do not publish automatically if a required check still fails on that day"
+              checked={opening.hold}
+              onChange={() => setOpening({ ...opening, hold: !opening.hold })}
+              disabled={opening.mode === 'self'}
+            />
           </div>
-          <Checkbox
-            label="Hold the opening if a required check still fails on that day"
-            checked={opening.hold}
-            onChange={() => setOpening({ ...opening, hold: !opening.hold })}
-            disabled={opening.mode === 'self'}
-          />
-        </div>,
-      )}
+        </Tabs.Panel>
+      </Tabs>
     </div>
   )
 }
