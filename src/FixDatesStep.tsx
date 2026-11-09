@@ -6,6 +6,7 @@ import {
   IconAssignmentLine,
   RadioInput,
   SimpleSelect,
+  Checkbox,
   Table,
   Text,
   Tooltip,
@@ -209,6 +210,13 @@ export default function FixDatesStep({
                 ? `${infos.length} dates cleared · set them after the copy`
                 : `${infos.length} dates to review · ${closedCount === 0 ? 'all on teaching days' : `${closedCount} on a non-teaching day · ${open.length} still to fix`}`}
             </Text>
+          </div>
+          <div style={{ marginBottom: t.space.lg }}>
+            <Checkbox
+              label="Copy last term’s calendar entries too (they are left out by default)"
+              checked={!!state.keepOldEvents}
+              onChange={() => setState({ ...state, keepOldEvents: !state.keepOldEvents })}
+            />
           </div>
           <Table caption={() => 'Dates of the items to copy'} themeOverride={noFill}>
             <Table.Head themeOverride={noFill}>

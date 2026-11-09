@@ -14,6 +14,7 @@ import ContentStep from "./ContentStep";
 import { nothingPicked, typesComing } from "./contentHelpers";
 import type { CopyMode, Picked, Scope } from "./contentHelpers";
 import ContentLoader from "./ContentLoader";
+import FigmaAlert from "./FigmaAlert";
 import SelectCourseStep from "./SelectCourseStep";
 import FixDatesStep from "./FixDatesStep";
 import ReviewAndCopyStep from "./ReviewAndCopyStep";
@@ -230,6 +231,8 @@ export default function RolloverWizard({
   const [reached, setReached] = useState(draft?.reached ?? 0);
   const [copying, setCopying] = useState(false);
   const [progress, setProgress] = useState(0);
+  // The copy was stopped while it ran. Nothing stays in the new course.
+  const [stopped, setStopped] = useState(false);
   const [when] = useState(() =>
     new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
   );
@@ -472,6 +475,7 @@ export default function RolloverWizard({
   }, [step]);
   const startCopy = () => {
     setProgress(0);
+    setStopped(false);
     setCopying(true);
   };
 
@@ -514,9 +518,15 @@ export default function RolloverWizard({
       <div
         style={{ display: "flex", flexDirection: "column", gap: t.space.xl }}
       >
+        {stopped && !copying && !loadingContent && (
+          <FigmaAlert variant="warning" type="inline" dismissible onDismiss={() => setStopped(false)}>
+            <Text as="div" weight="bold">You stopped the copy</Text>
+            <Text as="div">Nothing was added to the new course. Your choices are kept, so you can start the copy again.</Text>
+          </FigmaAlert>
+        )}
         <Stepper steps={steps} current={step} reached={reached} onGo={go} />
         {loadingContent ? (
-          <ContentLoader types={typesComing(scope ?? "whole", picked)} onDone={finishLoading} />
+          <ContentLoader types={typesComing(scope ?? "whole", picked)} onDone={finishLoading} onStop={() => setLoadingContent(false)} />
         ) : copying ? (
           <div
             style={{
@@ -538,6 +548,9 @@ export default function RolloverWizard({
             <Text color="secondary">
               Applying your choices from the review.
             </Text>
+            <div>
+              <Button onClick={() => { setCopying(false); setProgress(0); setStopped(true); }}>Stop the copy</Button>
+            </div>
           </div>
         ) : (
           <div

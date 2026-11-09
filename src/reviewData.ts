@@ -72,13 +72,10 @@ const KIND_LABEL: Record<TypeId, string> = {
 const HITS: Record<string, { rule: string; detail: string }[]> = {
   'assignments:1': [{ rule: 'links', detail: 'The reading link points to last year’s course and will not open for students in the new term.' }],
   'assignments:5': [{ rule: 'deliverables', detail: "No clear deliverable is specified. The text 'Show us what you built' does not say what students need to submit." }],
-  'assignments:4': [
-    { rule: 'deliverables', detail: 'The description names no format, length or number of reviews, so students cannot tell what a finished peer review looks like.' },
-    { rule: 'due-dates', detail: 'This assignment has no due date.' },
-  ],
+  // Due dates are not reviewed here. Step 4 (Fix dates) sets them.
+  'assignments:4': [{ rule: 'deliverables', detail: 'The description names no format, length or number of reviews, so students cannot tell what a finished peer review looks like.' }],
   'assignments:2': [{ rule: 'deliverables-2', detail: 'The description gives a length but not a file format or a submission type.' }],
   'quizzes:3': [{ rule: 'unused', detail: 'This quiz was never published last term, so no student has taken it.' }],
-  'discussions:1': [{ rule: 'due-dates', detail: 'This discussion has no due date.' }],
   'discussions:3': [{ rule: 'unused', detail: 'No student posted in this discussion last term.' }],
   'pages:1': [
     { rule: 'summary', detail: 'The page has an introduction and office hours, but no policies on late work or academic integrity.' },
@@ -116,10 +113,8 @@ const HITS: Record<string, { rule: string; detail: string }[]> = {
 const FIXES: Record<string, { what: string; after: string }> = {
   'assignments:1': { what: 'Swaps the reading link for this term’s version', after: 'Reading 1 (this term).' },
   'assignments:5': { what: 'Adds a clear deliverable to the description', after: 'Upload one PDF with your four portfolio projects. Add a note of 100 words or less for each project.' },
-  'assignments:4|deliverables': { what: 'A shorter description with the format and length', after: 'Review two classmates’ outlines. Write 150 words for each and post them as replies by Friday.' },
-  'assignments:4|due-dates': { what: 'Sets a due date in week 6', after: 'Due Friday of week 6, 11:59 PM.' },
+  'assignments:4': { what: 'Adds the format, length and number of reviews', after: 'Review two classmates’ outlines. Write 150 words for each and post them as replies by Friday.' },
   'assignments:2': { what: 'Adds the file format to the description', after: 'Upload a one-page PDF with your audience, your main goal and the tools you expect to use.' },
-  'discussions:1': { what: 'A clearer, shorter prompt', after: 'Share your name, your goal for this course and one design you admire. Reply to two classmates.' },
   'pages:1|summary': { what: 'Adds a short policy section', after: 'Late work loses 10% a day. Cite your sources and hand in your own work.' },
   'pages:1|alt-text': { what: 'Writes alt text for 3 images', after: 'Each image gets a short description of what it shows.' },
   'pages:2|links': { what: 'Swaps the old reading list for the current one', after: 'Reading list (this term).' },
@@ -127,7 +122,7 @@ const FIXES: Record<string, { what: string; after: string }> = {
   'pages:3': { what: 'Swaps both links for the current submission guide', after: 'How to submit your work (this term).' },
   'pages:4|links': { what: 'Swaps the old video link for the current one', after: 'Case study video (this term)' },
   'pages:4|alt-text': { what: 'Writes alt text for 4 images', after: 'Each image gets a short description of what it shows.' },
-  'announcements:1|communication': { what: 'A shorter version of the announcement', after: 'Welcome! The first module is open. Start with the welcome page.' },
+  'announcements:1|communication': { what: 'Adds a regular weekly update to this announcement', after: 'Welcome! The first module is open. Start with the welcome page. Every Monday I post what is coming that week.' },
   'announcements:1|links': { what: 'Swaps the video link for this term’s version', after: 'Welcome video (this term).' },
   'files:6': { what: 'Writes alt text for 6 images', after: 'Each image in the slides gets a short description of what it shows.' },
   'files:7': { what: 'Generates English captions for the video', after: 'Captions for all 4 minutes, ready to read through after the copy.' },
