@@ -109,8 +109,6 @@ export type FixDatesState = {
   rows: Record<string, RowChoice>
   // What the items with no due date get. Missing means they stay empty.
   noDate: Record<string, NoDateChoice>
-  // Last term's calendar entries stay out of the copy. Missing means they are left out (the default).
-  keepOldEvents?: boolean
 }
 export const INITIAL_DATES: FixDatesState = { mode: 'calendar', startText: '2027-01-25', fixAll: '', rows: {}, noDate: {} }
 

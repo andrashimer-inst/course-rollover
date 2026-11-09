@@ -69,8 +69,8 @@ export const TODO_GROUPS = [
 
 // When students see the course.
 // `date` is YYYY-MM-DD and `time` is HH:MM in the viewer's own time zone, the day and time the course publishes.
-export type Opening = { mode: 'open' | 'self'; hold: boolean; date: string; time: string; holdMissing?: boolean }
-export const INITIAL_OPENING: Opening = { mode: 'open', hold: true, holdMissing: true, date: '2027-01-19', time: '08:00' }
+export type Opening = { mode: 'open' | 'self'; hold: boolean; date: string; time: string }
+export const INITIAL_OPENING: Opening = { mode: 'open', hold: true, date: '2027-01-19', time: '08:00' }
 // The publish day and time as text, like "Tue, Jan 19 at 8:00 AM".
 export function openingLabel(o: Opening): string {
   const [y, m, d] = o.date.split('-').map(Number)
@@ -128,12 +128,6 @@ export function buildTodo(args: {
     }
   }
 
-  if (dates.keepOldEvents) {
-    todo.push({ group: 'Check after the copy', title: 'Last term’s calendar entries', detail: 'You chose to copy them. Delete the ones that no longer apply.' })
-  }
-  if (opening.holdMissing === false) {
-    todo.push({ group: 'Check after the copy', title: 'Missing-work rules', detail: 'They apply from the day you publish, not from the first day of the term. Check the gradebook.' })
-  }
   if (opening.mode === 'self') {
     todo.push({ group: 'Check after the copy', title: 'Publish the course', detail: 'You chose to publish it manually. The course stays unpublished until you do.' })
   }

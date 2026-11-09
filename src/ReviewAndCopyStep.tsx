@@ -397,11 +397,6 @@ export default function ReviewAndCopyStep({
               onChange={() => setOpening({ ...opening, hold: !opening.hold })}
               disabled={opening.mode === 'self'}
             />
-            <Checkbox
-              label="Hold missing-work rules until the term starts"
-              checked={opening.holdMissing ?? true}
-              onChange={() => setOpening({ ...opening, holdMissing: !(opening.holdMissing ?? true) })}
-            />
           </div>
         </Tabs.Panel>
       </Tabs>
