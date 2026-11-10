@@ -34,7 +34,8 @@ const noFill = { background: 'transparent' }
 // What makes a day a non-teaching day, in plain words: a weekend day or a holiday.
 const reasonOf = (closed: string) => {
   const day = closed.replace(/^a /, '')
-  return day === 'Saturday' || day === 'Sunday' ? `${day}, a weekend day` : `${day}, a holiday`
+  if (day === 'Saturday' || day === 'Sunday') return `${day}, a weekend day`
+  return day === 'Spring break' ? 'Spring break, a term break' : `${day}, a bank holiday`
 }
 
 // The first day field and the fix-all dropdown are the same width, wide enough for the longest choice.
@@ -291,7 +292,7 @@ export default function FixDatesStep({
                             )}
                           </div>
                           <Text as="div" weight="bold">
-                            {r.finalClosed ? 'Lands on' : 'Landed on'} {r.closed}{r.closed.startsWith('a ') ? ', which is a non-teaching day.' : ', a non-teaching day.'}
+                            {r.finalClosed ? 'Lands on' : 'Landed on'} {reasonOf(r.closed)}.
                           </Text>
                         </div>
                       ) : (

@@ -22,7 +22,7 @@ const NONE = 'Not in a module'
 export const DATE_ITEMS: DateItem[] = [
   { id: 'a1', itemId: 'assignments:1', title: 'Assignment 1: Reading response', kind: 'Assignment', module: WEEK1, old: d(2026, 9, 9) },
   { id: 'q1', itemId: 'quizzes:1', title: 'Quiz 1', kind: 'Quiz', module: WEEK1, old: d(2026, 9, 16) },
-  { id: 'e3', itemId: 'events:3', title: 'Office hours', kind: 'Event', module: NONE, old: d(2026, 9, 22), time: '15:00' },
+  { id: 'e3', itemId: 'events:3', title: 'Office hours', kind: 'Event', module: NONE, old: d(2026, 9, 21), time: '15:00' },
   { id: 'a2', itemId: 'assignments:2', title: 'Project proposal', kind: 'Assignment', module: WEEK2, old: d(2026, 10, 7) },
   { id: 'debate-a', itemId: 'discussions:2', title: 'Week 3 discussion', kind: 'Group discussion · Group A', module: WEEK2, old: d(2026, 10, 8) },
   { id: 'debate-b', itemId: 'discussions:2', title: 'Week 3 discussion', kind: 'Group discussion · Group B', module: WEEK2, old: d(2026, 10, 9), skew: 1 },
@@ -30,7 +30,7 @@ export const DATE_ITEMS: DateItem[] = [
   { id: 'a3', itemId: 'assignments:3', title: 'Assignment 3: Reflection', kind: 'Assignment', module: WEEK3, old: d(2026, 10, 14), skew: 2 },
   { id: 'e1', itemId: 'events:1', title: 'Guest speaker', kind: 'Event', module: NONE, old: d(2026, 10, 15), time: '14:00' },
   { id: 'q2', itemId: 'quizzes:2', title: 'Quiz 2', kind: 'Quiz', module: WEEK3, old: d(2026, 10, 21) },
-  { id: 'a4', itemId: 'assignments:4', title: 'Peer review', kind: 'Assignment', module: NONE, old: d(2026, 10, 28), skew: -6, time: '15:00' },
+  { id: 'a4', itemId: 'assignments:4', title: 'Peer review', kind: 'Assignment', module: NONE, old: d(2026, 10, 30), time: '15:00' },
   { id: 'q3', itemId: 'quizzes:3', title: 'Quiz 3', kind: 'Quiz', module: NONE, old: d(2026, 11, 11) },
   { id: 'e2', itemId: 'events:2', title: 'Portfolio review day', kind: 'Event', module: NONE, old: d(2026, 11, 18), time: '10:00' },
   { id: 'e4', itemId: 'events:4', title: 'Final presentations', kind: 'Event', module: NONE, old: d(2026, 12, 3), time: '16:30' },
@@ -76,7 +76,11 @@ export const timeOf = (item: { time?: string }) => item.time ?? DEFAULT_TIME
 export const FALL_START = d(2026, 8, 31)
 export const SPRING_START = d(2027, 1, 25)
 const SPRING_BREAK = { from: d(2027, 3, 15), to: d(2027, 3, 19) }
-const CLOSED = [{ date: d(2027, 2, 15), name: "Presidents' Day" }]
+// Bank holidays of the new term.
+const CLOSED = [
+  { date: d(2027, 2, 15), name: "Presidents' Day" },
+  { date: d(2027, 4, 2), name: 'Good Friday' },
+]
 
 export type DateMode = 'calendar' | 'clear'
 
