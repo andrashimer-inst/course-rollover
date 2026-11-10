@@ -83,8 +83,7 @@ export function buildTodo(args: {
 }): TodoItem[] {
   const { rows, choices, dates, comments, opening, included = all } = args
   const dated = DATE_ITEMS.filter((i) => included(i.itemId))
-  // Pages and files have no due date and need none, so only the kinds that can have one are on the list.
-  const undated = NO_DATE_ITEMS.filter((i) => i.dateable && included(i.itemId))
+  const undated = NO_DATE_ITEMS.filter((i) => included(i.itemId))
   const todo: TodoItem[] = []
 
   // Every item the educator chose to add to the to-do list is one entry, so the list grows with each choice.

@@ -38,20 +38,18 @@ export const DATE_ITEMS: DateItem[] = [
 ]
 
 // Items that have no due date in the old course. They stay empty, or the teacher sets them to the last day of the course.
-// `dateable` is for the kinds that can have a due date (assignments, quizzes, discussions, events). A page or a file shows as
-// having no due date, and there is nothing to set.
-export type NoDateItem = { id: string; itemId: string; title: string; kind: string; module: string; dateable: boolean }
+export type NoDateItem = { id: string; itemId: string; title: string; kind: string; module: string }
 const KIND_OF: Record<string, string> = { settings: 'Settings', syllabus: 'Syllabus', assignments: 'Assignment', quizzes: 'Quiz', banks: 'Question bank', discussions: 'Discussion', pages: 'Page', announcements: 'Announcement', rubrics: 'Rubric', outcomes: 'Outcome', files: 'File', events: 'Event' }
 const DATEABLE = new Set(['assignments', 'quizzes', 'discussions', 'events'])
 const moduleOfItem = (id: string) => {
   const m = CONTENT_TYPES.find((c) => c.id === 'modules')!.items.find((mod) => (MODULE_ENTRIES[mod.id] ?? []).some((e) => e.itemId === id))
   return m?.label ?? NONE
 }
-// Every other learning object of the course: the ones with no date in the old course.
-export const NO_DATE_ITEMS: NoDateItem[] = CONTENT_TYPES.filter((c) => c.id !== 'modules').flatMap((c) =>
+// Only the kinds that can have a due date (assignments, quizzes, discussions, events) can be missing one. A page or a file is not listed.
+export const NO_DATE_ITEMS: NoDateItem[] = CONTENT_TYPES.filter((c) => DATEABLE.has(c.id)).flatMap((c) =>
   (c.items.length ? c.items : [{ id: c.id, label: c.label }])
     .filter((i) => !DATE_ITEMS.some((x) => x.itemId === i.id))
-    .map((i) => ({ id: `n-${i.id}`, itemId: i.id, title: i.label, kind: KIND_OF[c.id] ?? c.label, module: moduleOfItem(i.id), dateable: DATEABLE.has(c.id) })),
+    .map((i) => ({ id: `n-${i.id}`, itemId: i.id, title: i.label, kind: KIND_OF[c.id] ?? c.label, module: moduleOfItem(i.id) })),
 )
 
 // Which learning objects are copied. A date row shows only for those. Without a filter, every row shows.

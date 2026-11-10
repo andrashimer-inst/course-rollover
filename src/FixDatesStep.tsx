@@ -375,10 +375,6 @@ export default function FixDatesStep({
                         <StatusPill size="sm" color="info">No due date</StatusPill>
                       </Table.Cell>
                       <Table.Cell themeOverride={noFill}>
-                        {!item.dateable ? (
-                          // A page or a file has no due date and needs none: nothing to set.
-                          <Text color="secondary">No date needed</Text>
-                        ) : (
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: t.space.sm }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             {date ? (
@@ -421,7 +417,6 @@ export default function FixDatesStep({
                             }}
                           />
                         </div>
-                        )}
                       </Table.Cell>
                     </Table.Row>
                   )
