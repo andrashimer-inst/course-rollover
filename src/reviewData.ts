@@ -70,7 +70,6 @@ const KIND_LABEL: Record<TypeId, string> = {
 
 // Where the design check found something, by item id. The detail is why this item was flagged.
 const HITS: Record<string, { rule: string; detail: string }[]> = {
-  'assignments:1': [{ rule: 'links', detail: 'The reading link points to last year’s course and will not open for students in the new term.' }],
   'assignments:5': [{ rule: 'deliverables', detail: "No clear deliverable is specified. The text 'Show us what you built' does not say what students need to submit." }],
   // Due dates are not reviewed here. Step 4 (Fix dates) sets them.
   'assignments:4': [{ rule: 'deliverables', detail: 'The description names no format, length or number of reviews, so students cannot tell what a finished peer review looks like.' }],
@@ -81,19 +80,9 @@ const HITS: Record<string, { rule: string; detail: string }[]> = {
     { rule: 'summary', detail: 'The page has an introduction and office hours, but no policies on late work or academic integrity.' },
     { rule: 'alt-text', detail: '3 images on this page have no alt text.' },
   ],
-  'pages:2': [
-    { rule: 'links', detail: 'A link to the 2023 reading list goes to a page that no longer exists.' },
-    { rule: 'alt-text', detail: '2 images on this page have no alt text.' },
-  ],
-  'pages:3': [{ rule: 'links', detail: 'Two links point to the old submission guide from the previous course.' }],
-  'pages:4': [
-    { rule: 'links', detail: 'A link to the case study video points to the previous course and will not open for students in the new term.' },
-    { rule: 'alt-text', detail: '4 images on this page have no alt text.' },
-  ],
-  'announcements:1': [
-    { rule: 'communication', detail: 'This is one of two announcements, both from the start of the term.' },
-    { rule: 'links', detail: 'The link to the welcome video points to the previous course.' },
-  ],
+  'pages:2': [{ rule: 'alt-text', detail: '2 images on this page have no alt text.' }],
+  'pages:4': [{ rule: 'alt-text', detail: '4 images on this page have no alt text.' }],
+  'announcements:1': [{ rule: 'communication', detail: 'This is one of two announcements, both from the start of the term.' }],
   'announcements:2': [{ rule: 'unused', detail: 'This announcement is about a guest talk from last term, and no student opened it this year.' }],
   'announcements:3': [{ rule: 'unused', detail: 'It reminds students of a quiz date from last term.' }],
   'announcements:4': [{ rule: 'unused', detail: 'The new office hours are already on the welcome page, so nobody needs this notice.' }],
@@ -111,19 +100,14 @@ const HITS: Record<string, { rule: string; detail: string }[]> = {
 // Quick fixes the AI offers, by item id. The text is made up.
 // A key is the item id (when the item has one finding) or "item id|rule" (when it has several).
 const FIXES: Record<string, { what: string; after: string }> = {
-  'assignments:1': { what: 'Swaps the reading link for this term’s version', after: 'Reading 1 (this term).' },
   'assignments:5': { what: 'Adds a clear deliverable to the description', after: 'Upload one PDF with your four portfolio projects. Add a note of 100 words or less for each project.' },
   'assignments:4': { what: 'Adds the format, length and number of reviews', after: 'Review two classmates’ outlines. Write 150 words for each and post them as replies by Friday.' },
   'assignments:2': { what: 'Adds the file format to the description', after: 'Upload a one-page PDF with your audience, your main goal and the tools you expect to use.' },
   'pages:1|summary': { what: 'Adds a short policy section', after: 'Late work loses 10% a day. Cite your sources and hand in your own work.' },
   'pages:1|alt-text': { what: 'Writes alt text for 3 images', after: 'Each image gets a short description of what it shows.' },
-  'pages:2|links': { what: 'Swaps the old reading list for the current one', after: 'Reading list (this term).' },
-  'pages:2|alt-text': { what: 'Writes alt text for 2 images', after: 'Each image gets a short description of what it shows.' },
-  'pages:3': { what: 'Swaps both links for the current submission guide', after: 'How to submit your work (this term).' },
-  'pages:4|links': { what: 'Swaps the old video link for the current one', after: 'Case study video (this term)' },
-  'pages:4|alt-text': { what: 'Writes alt text for 4 images', after: 'Each image gets a short description of what it shows.' },
-  'announcements:1|communication': { what: 'Adds a regular weekly update to this announcement', after: 'Welcome! The first module is open. Start with the welcome page. Every Monday I post what is coming that week.' },
-  'announcements:1|links': { what: 'Swaps the video link for this term’s version', after: 'Welcome video (this term).' },
+  'pages:2': { what: 'Writes alt text for 2 images', after: 'Each image gets a short description of what it shows.' },
+  'pages:4': { what: 'Writes alt text for 4 images', after: 'Each image gets a short description of what it shows.' },
+  'announcements:1': { what: 'Adds a regular weekly update to this announcement', after: 'Welcome! The first module is open. Start with the welcome page. Every Monday I post what is coming that week.' },
   'files:6': { what: 'Writes alt text for 6 images', after: 'Each image in the slides gets a short description of what it shows.' },
   'files:7': { what: 'Generates English captions for the video', after: 'Captions for all 4 minutes, ready to read through after the copy.' },
   'syllabus|feedback-timeline': { what: 'Adds the feedback timeline', after: 'You get feedback on every assignment within 7 days.' },
@@ -264,8 +248,8 @@ const COURSE_ROWS: { id: string; title: string; rule: string; detail: string; fi
     id: 'course:links',
     title: 'Broken links',
     rule: 'links',
-    detail: '2 links point to the previous course or return a not found error.',
-    fix: { what: 'Swaps both links for this term’s versions', after: 'Case study video (this term) and Design Studio guest talk (2026 recording).' },
+    detail: '6 links on 5 items point to the previous course or return a not found error: Assignment 1, the reading list page, the submission guide page (2 links), the case study page and the welcome announcement.',
+    fix: { what: 'Swaps all 6 links for this term’s versions', after: 'Reading 1, Reading list, How to submit your work, Case study video and Welcome video, all this term’s versions.' },
     reason: 'Students would hit a dead end in week 1, so fix them before the copy.',
   },
   {
