@@ -11,15 +11,16 @@ import {
 } from "@instructure/ui/v11_7";
 import DesktopWrapper from "./DesktopWrapper";
 import ContentStep from "./ContentStep";
-import { nothingPicked, typesComing } from "./contentHelpers";
+import { nothingPicked } from "./contentHelpers";
 import type { CopyMode, Picked, Scope } from "./contentHelpers";
-import ContentLoader from "./ContentLoader";
+import ReadinessLoading from "./ReadinessLoading";
+import RulesModal from "./RulesModal";
 import FigmaAlert from "./FigmaAlert";
 import SelectCourseStep from "./SelectCourseStep";
 import FixDatesStep from "./FixDatesStep";
 import ReviewAndCopyStep from "./ReviewAndCopyStep";
 import { buildHistory } from "./copyHistory";
-import { INITIAL_OPENING, buildTodo, openingLabel, readiness } from "./reviewCopyData";
+import { INITIAL_OPENING, buildTodo, dimensionsOf, openingLabel, readiness } from "./reviewCopyData";
 import type { Opening } from "./reviewCopyData";
 import { DATE_ITEMS, INITIAL_DATES, dateCounts } from "./fixDatesData";
 import type { FixDatesState } from "./fixDatesData";
@@ -239,9 +240,14 @@ export default function RolloverWizard({
   // What the educator chose for each learning object, and which of two similar modules to keep.
   const [choices, setChoices] = useState<Record<string, Choice>>(draft?.choices ?? {});
   const [dupes, setDupes] = useState<Record<string, DupeChoice>>(draft?.dupes ?? {});
+  // The rules the educator switched off for the readiness check. They give no findings and are not in the check.
+  const [offRules, setOffRules] = useState<string[]>([]);
+  // The rules ticked in the checker window, which opens after step 2. They count once the educator chooses Analyze.
+  const [draftOff, setDraftOff] = useState<string[]>([]);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const rows = useMemo(
-    () => buildRows(scope ?? "whole", picked, comments),
-    [scope, picked, comments],
+    () => buildRows(scope ?? "whole", picked, comments, offRules),
+    [scope, picked, comments, offRules],
   );
   // Choosing another course starts the review over.
   const [reviewedFor, setReviewedFor] = useState(draft?.course ?? "");
@@ -339,7 +345,7 @@ export default function RolloverWizard({
       todo: [
         ...FAILED_ITEMS.map((f) => ({ group: "Fix after the copy", title: `Copy failed: ${f.item}`, detail: f.fix })),
         // The list is gathered from the choices made in the steps before.
-        ...buildTodo({ rows, choices, ready: readiness(rows, choices), dates, comments, opening }),
+        ...buildTodo({ rows, choices, ready: readiness(rows, choices, offRules), dates, comments, opening }),
       ],
       datesShifted: adjustDates ? shifted : 0,
       datesEdited: adjustDates ? edited : 0,
@@ -350,6 +356,7 @@ export default function RolloverWizard({
     dates,
     comments,
     opening,
+    offRules,
     adjustDates,
     courseNav.name,
     course,
@@ -414,8 +421,8 @@ export default function RolloverWizard({
 
   // The to-do list so far. It follows the choices, so the review step can show it while the choices are made.
   const todoNow = useMemo(
-    () => buildTodo({ rows, choices, ready: readiness(rows, choices), dates, comments, opening }),
-    [rows, choices, dates, comments, opening],
+    () => buildTodo({ rows, choices, ready: readiness(rows, choices, offRules), dates, comments, opening }),
+    [rows, choices, dates, comments, opening, offRules],
   );
 
   const [todoOpen, setTodoOpen] = useState(false);
@@ -524,9 +531,31 @@ export default function RolloverWizard({
             <Text as="div">Nothing was added to the new course. Your choices are kept, so you can start the copy again.</Text>
           </FigmaAlert>
         )}
+        <RulesModal
+          open={rulesOpen}
+          off={draftOff}
+          setOff={setDraftOff}
+          onClose={() => setRulesOpen(false)}
+          onAnalyze={() => {
+            setRulesOpen(false);
+            setOffRules(draftOff);
+            setLoadingContent(true);
+          }}
+        />
         <Stepper steps={steps} current={step} reached={reached} onGo={go} />
         {loadingContent ? (
-          <ContentLoader types={typesComing(scope ?? "whole", picked)} onDone={finishLoading} onStop={() => setLoadingContent(false)} />
+          // The wait after step 2 is the course readiness check, the same as the check in steps 3 and 5.
+          <div style={{ display: "flex", flexDirection: "column", gap: t.space.lg, padding: `${t.space.xl} 0` }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: t.space.sm }}>
+              <Text as="div" weight="bold" size="large">Course readiness check</Text>
+              <Text as="div" color="secondary">The check uses the course design rules and your choices.</Text>
+            </div>
+            <ReadinessLoading
+              areas={dimensionsOf(readiness(rows, choices, offRules)).map((g) => g.dimension)}
+              onDone={finishLoading}
+              onStop={() => setLoadingContent(false)}
+            />
+          </div>
         ) : copying ? (
           <div
             style={{
@@ -576,6 +605,10 @@ export default function RolloverWizard({
             )}
             {id === "review" && (
               <LearningObjectReview
+                offRules={offRules}
+                setOffRules={setOffRules}
+                draftOff={draftOff}
+                setDraftOff={setDraftOff}
                 rows={rows}
                 choices={choices}
                 setChoices={setChoices}
@@ -592,6 +625,7 @@ export default function RolloverWizard({
             )}
             {id === "copy" && (
               <ReviewAndCopyStep
+                offRules={offRules}
                 rows={rows}
                 choices={choices}
                 scope={scope ?? "whole"}
@@ -649,7 +683,7 @@ export default function RolloverWizard({
                   color="primary"
                   onClick={() =>
                     id === "content"
-                      ? setLoadingContent(true)
+                      ? setRulesOpen(true)
                       : id === "review" && undecided.length > 0
                         ? (setBringInfo({ count: undecided.length, none: Object.keys(choices).length === 0 }), setConfirmBring(true))
                         : go(step + 1)

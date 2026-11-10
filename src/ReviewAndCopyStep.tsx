@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Checkbox, DateInput, IconArrowOpenDownSolid, IconArrowOpenEndSolid, IconArrowOpenUpSolid, IconAssignmentLine, IconCheckMarkSolid, SimpleSelect, Tabs, RadioInput, Spinner, Text } from '@instructure/ui/v11_7'
+import { Button, Checkbox, DateInput, IconArrowOpenDownSolid, IconArrowOpenEndSolid, IconArrowOpenUpSolid, IconAssignmentLine, SimpleSelect, Tabs, RadioInput, Text } from '@instructure/ui/v11_7'
 import StatusPill from './StatusPill'
+import ReadinessLoading from './ReadinessLoading'
 import { CoursePreview } from './ContentStep'
 import { CONTENT_TYPES, MODULE_ENTRIES } from './courseContentData'
 import type { CopyMode, Picked, Scope } from './contentHelpers'
@@ -17,8 +18,6 @@ import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 // Step 5 of the copy wizard: review and copy. Before the copy runs, the teacher can run the course readiness check,
 // see a final preview of the modules with a note on what the choices changed, and choose when students see the
 // course. The copy itself starts from this step. The to-do list comes with the summary afterwards.
-
-const STEP_MS = 450
 
 const STATUS_PILL: Record<ReadyStatus, 'success' | 'warning' | 'error'> = {
   pass: 'success',
@@ -42,10 +41,12 @@ const TIMES = Array.from({ length: 48 }, (_, i) => {
 const MODULES = CONTENT_TYPES.find((c) => c.id === 'modules')!.items
 
 export default function ReviewAndCopyStep({
-  rows, choices, scope, mode, picked, dupes, dates, readyRan, setReadyRan, opening, setOpening, todoCount, onToggleTodo,
+  rows, choices, offRules, scope, mode, picked, dupes, dates, readyRan, setReadyRan, opening, setOpening, todoCount, onToggleTodo,
 }: {
   rows: ReviewRow[]
   choices: Record<string, Choice>
+  // The rules the educator switched off in the review step.
+  offRules: string[]
   scope: Scope
   mode: CopyMode
   picked: Picked
@@ -68,27 +69,13 @@ export default function ReviewAndCopyStep({
   const [tab, setTab] = useState(0)
   // The groups of the learning objects tab open and close like an accordion. They start open.
   const [closedGroups, setClosedGroups] = useState<string[]>([])
-  const ready = useMemo(() => readiness(rows, choices), [rows, choices])
+  const ready = useMemo(() => readiness(rows, choices, offRules), [rows, choices, offRules])
   const groups = useMemo(() => dimensionsOf(ready), [ready])
 
   // The readiness check goes through one area at a time. It can take a while, so each area shows its own progress.
   const [running, setRunning] = useState(false)
-  const [doneAreas, setDoneAreas] = useState(0)
-  useEffect(() => {
-    if (!running) return
-    if (doneAreas >= groups.length) {
-      const end = setTimeout(() => {
-        setRunning(false)
-        setReadyRan(true)
-      }, 300)
-      return () => clearTimeout(end)
-    }
-    const next = setTimeout(() => setDoneAreas((n) => n + 1), STEP_MS)
-    return () => clearTimeout(next)
-  }, [running, doneAreas, groups.length, setReadyRan])
   const run = () => {
     setReadyRan(false)
-    setDoneAreas(0)
     setRunning(true)
   }
 
@@ -113,8 +100,8 @@ export default function ReviewAndCopyStep({
   // A summary of the choices made, one line for each area.
   const changes: string[] = [
     scope === 'whole'
-      ? `Scope: the whole course (${MODULES.length} modules and all learning objects). It replaces the current content.`
-      : `Scope: ${moduleIds.length} of ${MODULES.length} modules. ${merging ? 'They are merged with the current content.' : 'They replace the current content.'}`,
+      ? `Scope: the whole course (${MODULES.length} modules and all learning objects). It replaces the content copied here before. Content you added yourself stays.`
+      : `Scope: ${moduleIds.length} of ${MODULES.length} modules. ${merging ? 'They are added to the content in the course now.' : 'They replace the content copied here before. Content you added yourself stays.'}`,
     leftOut.length ? `Left out: ${leftOut.length} ${leftOut.length === 1 ? 'item' : 'items'} (${leftOut.map((r) => r.title).join(', ')}).` : 'Left out: nothing.',
     aiFixed.length ? `AI fixes: ${aiFixed.length} applied during the copy.` : 'AI fixes: none applied.',
     fixLater.length ? `To fix after the copy: ${fixLater.length} ${fixLater.length === 1 ? 'item' : 'items'}, on your to-do list.` : 'To fix after the copy: nothing.',
@@ -178,22 +165,7 @@ export default function ReviewAndCopyStep({
             <div style={{ marginTop: t.space.lg }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
                 {running && (
-                  <div role="status">
-                    <Text as="div" color="secondary">This can take some time. Keep this page open.</Text>
-                    <ul style={{ listStyle: 'none', margin: `${t.space.md} 0 0`, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(15rem, 1fr))', gap: t.space.md }}>
-                      {groups.map((g, i) => (
-                        <li key={g.dimension} style={{ display: 'flex', alignItems: 'center', gap: t.space.md, opacity: i <= doneAreas ? 1 : 0.5 }}>
-                          <span style={{ display: 'inline-flex', width: '1.5rem', color: t.successTextColor }}>
-                            {i < doneAreas ? <IconCheckMarkSolid /> : i === doneAreas ? <Spinner renderTitle={`Checking ${g.dimension}`} size="x-small" /> : null}
-                          </span>
-                          <span>
-                            <Text as="div" weight="bold">{g.dimension}</Text>
-                            <Text as="div" size="small" color="secondary">{i < doneAreas ? 'Checked' : i === doneAreas ? 'Checking' : 'Waiting'}</Text>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ReadinessLoading areas={groups.map((g) => g.dimension)} onDone={() => { setRunning(false); setReadyRan(true) }} />
                 )}
                 {readyRan && !running && (
                   <div>
@@ -243,7 +215,7 @@ export default function ReviewAndCopyStep({
               title="Preview"
               moduleIds={moduleIds}
               keepCurrent={merging}
-              highlightNew={scope === 'part'}
+              highlightNew
               hidden={hiddenModules(dupes)}
               noteFor={noteFor}
             />

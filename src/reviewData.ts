@@ -64,6 +64,7 @@ const KIND_LABEL: Record<TypeId, string> = {
   pages: 'Page',
   announcements: 'Announcement',
   rubrics: 'Rubric',
+  outcomes: 'Outcome',
   files: 'File',
   events: 'Calendar event',
 }
@@ -177,7 +178,8 @@ function aiFor(findings: Finding[], note?: EducatorComment): ReviewRow['ai'] {
 }
 
 // The rows that are copied, in the order of the course. Items in a module sit under that module.
-export function buildRows(scope: Scope, picked: Picked, comments: EducatorComment[]): ReviewRow[] {
+// `off` lists the rules the educator switched off. They give no finding.
+export function buildRows(scope: Scope, picked: Picked, comments: EducatorComment[], off: string[] = []): ReviewRow[] {
   const eff = withPulledIn(picked)
   const moduleOf: Record<string, string> = {}
   const modules = CONTENT_TYPES.find((c) => c.id === 'modules')!.items
@@ -189,7 +191,8 @@ export function buildRows(scope: Scope, picked: Picked, comments: EducatorCommen
     const items = type.items.length ? type.items : [{ id: type.id, label: type.label }]
     for (const item of items) {
       if (scope === 'part' && !eff[item.id]) continue
-      const all = (HITS[item.id] ?? []).map((h) => ({ rule: rule(h.rule), detail: h.detail }))
+      const total = (HITS[item.id] ?? []).length
+      const all = (HITS[item.id] ?? []).filter((h) => !off.includes(h.rule)).map((h) => ({ rule: rule(h.rule), detail: h.detail }))
       const note = comments.find((c) => sameItem(c.item, item.label))
       // An item with several findings gets a row for each, so every finding has its own fix and its own choice.
       const parts = all.length > 1 ? all.map((f) => [f]) : [all]
@@ -197,7 +200,7 @@ export function buildRows(scope: Scope, picked: Picked, comments: EducatorCommen
       parts.forEach((findings, n) => {
         const rowNote = n === 0 ? note : undefined
         const ai = aiFor(findings, rowNote)
-        const fix = all.length > 1 ? FIXES[`${item.id}|${findings[0].rule.id}`] : FIXES[item.id]
+        const fix = total > 1 ? FIXES[`${item.id}|${findings[0]?.rule.id}`] : FIXES[item.id]
         rows.push({
           id: ids[n],
           itemId: item.id,
@@ -216,7 +219,7 @@ export function buildRows(scope: Scope, picked: Picked, comments: EducatorCommen
       })
     }
   }
-  rows.push(...COURSE_ROWS.map((c) => courseRow(c)))
+  rows.push(...COURSE_ROWS.filter((c) => !off.includes(c.rule)).map((c) => courseRow(c)))
   // Group order: the whole course first, then modules in course order, then the rest in the order they were found.
   const order = ['Whole course', ...modules.map((m) => m.label), 'Course']
   const rank = (g: string) => (order.includes(g) ? order.indexOf(g) : order.length)

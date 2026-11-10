@@ -7,6 +7,7 @@ import {
   IconDocumentLine,
   IconFolderLine,
   IconModuleLine,
+  IconOutcomesLine,
   IconQuestionLine,
   IconQuizLine,
   IconRubricLine,
@@ -34,6 +35,7 @@ export const TYPE_ICON: Record<TypeId, ReactNode> = {
   pages: <IconDocumentLine />,
   announcements: <IconAnnouncementLine />,
   rubrics: <IconRubricLine />,
+  outcomes: <IconOutcomesLine />,
   files: <IconFolderLine />,
   events: <IconCalendarMonthLine />,
 }

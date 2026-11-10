@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Calendar, CalendarInstUIIcon, IconButton, Popover } from '@instructure/ui/v11_7'
-import { closedName } from './fixDatesData'
 
 // A secondary icon button that opens the same calendar the date field uses (InstUI Calendar in a Popover). Days that are
 // not teaching days cannot be picked. `value` and what `onPick` returns are ISO dates (YYYY-MM-DD).
@@ -45,7 +44,6 @@ export default function DatePickerButton({
           currentDate={isoDay(value)}
           selectedDate={isoDay(value)}
           selectedLabel="Selected"
-          disabledDates={(iso: string) => closedName(dateOf(iso)) !== null}
           onRequestRenderNextMonth={(_e: unknown, requested: string) => setMonth(requested)}
           onRequestRenderPrevMonth={(_e: unknown, requested: string) => setMonth(requested)}
           onDateSelected={(iso: string) => {
