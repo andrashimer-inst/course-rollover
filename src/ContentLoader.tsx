@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IconCheckMarkSolid, Spinner, Text } from '@instructure/ui/v11_7'
+import { Button, IconCheckMarkSolid, Spinner, Text } from '@instructure/ui/v11_7'
 import { TYPE_ICON } from './contentHelpers'
 import type { ContentType } from './courseContentData'
 import { useSurfaceTokens } from './appTheme'
@@ -9,7 +9,7 @@ import { useSurfaceTokens } from './appTheme'
 
 const STEP_MS = 650
 
-export default function ContentLoader({ types, onDone }: { types: ContentType[]; onDone: () => void }) {
+export default function ContentLoader({ types, onDone, onStop }: { types: ContentType[]; onDone: () => void; onStop: () => void }) {
   const t = useSurfaceTokens()
   const [done, setDone] = useState(0)
 
@@ -58,6 +58,9 @@ export default function ContentLoader({ types, onDone }: { types: ContentType[];
           )
         })}
       </ul>
+      <div>
+        <Button onClick={onStop}>Stop loading</Button>
+      </div>
     </div>
   )
 }

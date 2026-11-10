@@ -32,6 +32,11 @@ export function readiness(rows: ReviewRow[], choices: Record<string, Choice>): R
       out.push({ rule, status: 'pass', note: 'Nothing to change.' })
       continue
     }
+    // Due dates are set in the dates step, so they are not a finding of the review.
+    if (rule.id === 'due-dates') {
+      out.push({ rule, status: 'fixed', note: 'Set in the Fix dates step.' })
+      continue
+    }
     const hit = rows.filter((r) => r.findings.some((f) => f.rule.id === rule.id))
     if (hit.length === 0) {
       // Rules that none of the review rows cover can only be fixed by hand, after the copy.
@@ -142,6 +147,28 @@ export function exportTodo(todo: TodoItem[], course: string) {
   const a = document.createElement('a')
   a.href = url
   a.download = `to-do-after-copying-${course.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Send the to-do list to the teacher's own email. It opens their mail app with the list filled in.
+export function emailTodo(todo: TodoItem[], course: string) {
+  const body = todo.map((t) => `- ${t.title}: ${t.detail}`).join('\n')
+  window.location.href = `mailto:?subject=${encodeURIComponent(`To do after copying ${course}`)}&body=${encodeURIComponent(body)}`
+}
+
+// Download the to-do list as calendar entries (.ics), one all-day entry for each item, starting tomorrow.
+export function calendarTodo(todo: TodoItem[], course: string) {
+  const day = new Date()
+  day.setDate(day.getDate() + 1)
+  const stamp = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  const esc = (x: string) => x.replace(/[,;\\]/g, (c) => `\\${c}`).replace(/\n/g, '\\n')
+  const events = todo.map((t, i) => ['BEGIN:VEVENT', `UID:todo-${i}@course-rollover`, `DTSTAMP:${stamp(new Date())}T000000Z`, `DTSTART;VALUE=DATE:${stamp(day)}`, `SUMMARY:${esc(t.title)}`, `DESCRIPTION:${esc(t.detail)}`, 'END:VEVENT'].join('\r\n'))
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Course Rollover//EN', ...events, 'END:VCALENDAR'].join('\r\n')
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `to-do-${course.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.ics`
   a.click()
   URL.revokeObjectURL(url)
 }

@@ -4,7 +4,7 @@ import AutoSelect from './AutoSelect'
 import FigmaAlert from './FigmaAlert'
 import StatusPill from './StatusPill'
 import { PEOPLE } from './copyHistory'
-import { TODO_GROUPS, exportTodo } from './reviewCopyData'
+import { TODO_GROUPS, calendarTodo, emailTodo, exportTodo } from './reviewCopyData'
 import type { CopySummary, HistoryEvent } from './rolloverData'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
@@ -198,9 +198,13 @@ export function SummaryView({
                   <Text as="div" weight="bold" size="large">To-do list</Text>
                   <Text as="div" color="secondary">Actions that still need your attention after the copy. Export the list to keep it.</Text>
                 </div>
-                <Button renderIcon={<IconExportLine />} onClick={() => exportTodo(todoAll, summary.course)}>
-                  Export to-do list
-                </Button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.sm }}>
+                  <Button onClick={() => calendarTodo(todoAll, summary.course)}>Add to calendar</Button>
+                  <Button onClick={() => emailTodo(todoAll, summary.course)}>Email the list</Button>
+                  <Button renderIcon={<IconExportLine />} onClick={() => exportTodo(todoAll, summary.course)}>
+                    Export to-do list
+                  </Button>
+                </div>
               </div>
               <Table caption={() => 'To-do list after the copy'} themeOverride={noFill}>
                 <Table.Head themeOverride={noFill}>
