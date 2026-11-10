@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, IconCheckMarkSolid, Spinner, Text } from '@instructure/ui/v11_7'
+import { IconCheckMarkSolid, Spinner, Text } from '@instructure/ui/v11_7'
 import { useSurfaceTokens } from './appTheme'
 
 // The course readiness check at work: it goes through one design area at a time, with a spinner on the area it is
@@ -8,7 +8,7 @@ import { useSurfaceTokens } from './appTheme'
 
 const STEP_MS = 450
 
-export default function ReadinessLoading({ areas, onDone, onStop }: { areas: string[]; onDone: () => void; onStop?: () => void }) {
+export default function ReadinessLoading({ areas, onDone }: { areas: string[]; onDone: () => void }) {
   const t = useSurfaceTokens()
   const [doneAreas, setDoneAreas] = useState(0)
   const finish = useRef(onDone)
@@ -53,11 +53,6 @@ export default function ReadinessLoading({ areas, onDone, onStop }: { areas: str
           </li>
         ))}
       </ul>
-      {onStop && (
-        <div style={{ marginTop: t.space.lg }}>
-          <Button onClick={onStop}>Stop checking</Button>
-        </div>
-      )}
     </div>
   )
 }
