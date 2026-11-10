@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Button, IconArrowOpenEndSolid, IconArrowOpenStartSolid, IconButton, IconExportLine, IconSearchLine, Link, Metric, ScreenReaderContent, SimpleSelect, Table, Tabs, Text, TextInput } from '@instructure/ui/v11_7'
+import { Button, IconEmailLine, IconExportLine, IconSearchLine, Link, Metric, ScreenReaderContent, SimpleSelect, Table, Tabs, Text, TextInput } from '@instructure/ui/v11_7'
+import AdminHelpModal from './AdminHelpModal'
 import AutoSelect from './AutoSelect'
+import Pager from './Pager'
 import FigmaAlert from './FigmaAlert'
 import StatusPill from './StatusPill'
 import { PEOPLE } from './copyHistory'
-import { TODO_GROUPS, calendarTodo, emailTodo, exportTodo } from './reviewCopyData'
+import { TODO_GROUPS, exportTodo, failedTodo, groupTodo, tagOf } from './reviewCopyData'
 import type { CopySummary, HistoryEvent } from './rolloverData'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
@@ -56,6 +58,8 @@ export function SummaryView({
   const [tab, setTab] = useState(0)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  // The to-do list sent to the educator by message, in the same window as the message to the admin in the learning object review.
+  const [helpOpen, setHelpOpen] = useState(false)
 
   // What was not copied. A failure is an error, not a decision, so it has a red pill and is on the to-do list.
   type NotCopied = { item: string; reason: string; kind: 'failed' | 'left-out' | 'canvas' | 'attention'; canBring: boolean }
@@ -70,11 +74,10 @@ export function SummaryView({
     attention: { label: 'Needs attention', color: 'warning' },
   }
   // Every failure is on the to-do list, also on copies where the list did not have it yet.
+  // The failures are rebuilt from the list of failed items, so one entry never shows twice, whichever way it was saved.
   const todoAll = [
-    ...summary.todo,
-    ...summary.failed
-      .filter((f) => !summary.todo.some((x) => x.title === `Copy failed: ${f.item}`))
-      .map((f) => ({ group: 'Fix after the copy', title: `Copy failed: ${f.item}`, detail: f.fix })),
+    ...summary.todo.filter((x) => x.tag !== 'Copy failed' && !x.title.startsWith('Copy failed:')),
+    ...summary.failed.map(failedTodo),
   ]
 
   const history = summary.history
@@ -86,39 +89,7 @@ export function SummaryView({
   const pageCount = Math.max(1, Math.ceil(history.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const pageRows = history.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  // Previous and next arrows with the page numbers between them. The arrows are always there, also with few pages.
-  const pageNumbers: (number | 'gap')[] = []
-  for (let n = 1; n <= pageCount; n++) {
-    if (n === 1 || n === pageCount || Math.abs(n - currentPage) <= 1 || pageCount <= 7) pageNumbers.push(n)
-    else if (pageNumbers[pageNumbers.length - 1] !== 'gap') pageNumbers.push('gap')
-  }
-  const pager =
-    pageCount > 1 ? (
-      <nav aria-label="Copy history pages" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: t.space.sm }}>
-        <IconButton screenReaderLabel="Previous page" size="small" interaction={currentPage > 1 ? 'enabled' : 'disabled'} onClick={() => setPage(currentPage - 1)}>
-          <IconArrowOpenStartSolid />
-        </IconButton>
-        {pageNumbers.map((n, i) =>
-          n === 'gap' ? (
-            <Text key={`gap-${i}`} color="secondary">…</Text>
-          ) : (
-            <Button
-              key={n}
-              size="small"
-              color={n === currentPage ? 'primary' : 'secondary'}
-              aria-current={n === currentPage ? 'page' : undefined}
-              onClick={() => setPage(n)}
-            >
-              <ScreenReaderContent>Page </ScreenReaderContent>
-              {n}
-            </Button>
-          ),
-        )}
-        <IconButton screenReaderLabel="Next page" size="small" interaction={currentPage < pageCount ? 'enabled' : 'disabled'} onClick={() => setPage(currentPage + 1)}>
-          <IconArrowOpenEndSolid />
-        </IconButton>
-      </nav>
-    ) : null
+  const pager = <Pager label="Copy history pages" page={currentPage} pageCount={pageCount} onPage={setPage} />
   const stills = todoAll.length
   const created = summary.stats.created + brought.length
 
@@ -199,8 +170,9 @@ export function SummaryView({
                   <Text as="div" color="secondary">Actions that still need your attention after the copy. Export the list to keep it.</Text>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.space.sm }}>
-                  <Button onClick={() => calendarTodo(todoAll, summary.course)}>Add to calendar</Button>
-                  <Button onClick={() => emailTodo(todoAll, summary.course)}>Email the list</Button>
+                  {/* In the real product this adds the items to the Canvas calendar. Nothing happens in the prototype. */}
+                  <Button>Add to calendar</Button>
+                  <Button renderIcon={<IconEmailLine />} onClick={() => setHelpOpen(true)}>Email the list</Button>
                   <Button renderIcon={<IconExportLine />} onClick={() => exportTodo(todoAll, summary.course)}>
                     Export to-do list
                   </Button>
@@ -209,7 +181,8 @@ export function SummaryView({
               <Table caption={() => 'To-do list after the copy'} themeOverride={noFill}>
                 <Table.Head themeOverride={noFill}>
                   <Table.Row themeOverride={noFill}>
-                    <Table.ColHeader themeOverride={noFill} id="todo-item" width="35%">To do</Table.ColHeader>
+                    <Table.ColHeader themeOverride={noFill} id="todo-content" width="30%">Learning object</Table.ColHeader>
+                    <Table.ColHeader themeOverride={noFill} id="todo-item" width="40%">To do</Table.ColHeader>
                     <Table.ColHeader themeOverride={noFill} id="todo-detail">Details</Table.ColHeader>
                   </Table.Row>
                 </Table.Head>
@@ -221,11 +194,39 @@ export function SummaryView({
                       <Table.Row themeOverride={noFill} key={`g-${g}`}>
                         <Table.Cell themeOverride={noFill}><Text weight="bold">{g} ({items.length})</Text></Table.Cell>
                         <Table.Cell themeOverride={noFill} />
+                        <Table.Cell themeOverride={noFill} />
                       </Table.Row>,
-                      ...items.map((x) => (
-                        <Table.Row themeOverride={noFill} key={`${g}-${x.title}`}>
-                          <Table.Cell themeOverride={noFill}>{x.title}</Table.Cell>
-                          <Table.Cell themeOverride={noFill}>{x.detail}</Table.Cell>
+                      // An item with more than one problem is one row: its name once, and each problem under "To do".
+                      ...groupTodo(items).map((grp, i) => (
+                        <Table.Row themeOverride={noFill} key={`${g}-${i}`}>
+                          <Table.Cell themeOverride={noFill}>
+                            {/* A link to the item in the course. It does not go anywhere in the prototype. */}
+                            {grp.content ? (
+                              // The item and the module it is in are two links: "Energy essay (Assignment), in Module 4: Energy".
+                              grp.content.split(', in ').map((part, n) => (
+                                <span key={part}>
+                                  {n > 0 && ', in '}
+                                  <Link as="button" onClick={() => {}}>{part}</Link>
+                                </span>
+                              ))
+                            ) : (
+                              <Text color="secondary">None</Text>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell themeOverride={noFill}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.md }}>
+                              {grp.entries.map((x, n) => (
+                                <div key={n}>
+                                  {/* The pill says what kind of thing it is, the same pills as in the review. */}
+                                  {tagOf(x) && <div style={{ marginBottom: t.space.xs }}><StatusPill size="sm" color={tagOf(x)!.tone}>{tagOf(x)!.tag}</StatusPill></div>}
+                                  {x.title}
+                                  {grp.entries.length > 1 && x.detail !== x.content && <Text as="div" size="small" color="secondary">{x.detail}</Text>}
+                                </div>
+                              ))}
+                            </div>
+                          </Table.Cell>
+                          {/* The location is already in the first column, so details only show when it says something else, like how to fix a failed item. */}
+                          <Table.Cell themeOverride={noFill}>{grp.entries.length === 1 && grp.entries[0].detail !== grp.content ? grp.entries[0].detail : ''}</Table.Cell>
                         </Table.Row>
                       )),
                     ]
@@ -378,6 +379,13 @@ export function SummaryView({
       </section>
       )}
 
+      <AdminHelpModal
+        open={helpOpen}
+        items={todoAll.map((x) => ({ title: x.title, detail: x.detail }))}
+        draft={{ to: 'Me', subject: `To do after copying ${summary.course}`, message: (list) => `Hi,\n\nHere is what is left to do after copying ${summary.course}:\n\n${list}\n\nThank you` }}
+        onClose={() => setHelpOpen(false)}
+        onSend={() => {}}
+      />
     </div>
   )
 }

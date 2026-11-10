@@ -32,7 +32,7 @@ export default function SelectCourseStep({ selected, onSelect }: { selected: str
   const card = useAppThemeKey() !== 'legacy'
   const [query, setQuery] = useState('')
   const [taught, setTaught] = useState(ANY)
-  const [subAccount, setSubAccount] = useState(ANY)
+  const [subAccount, setSubAccount] = useState(SUB_ACCOUNTS[2])
   const [time, setTime] = useState(ANY)
   const [sortBy, setSortBy] = useState<SortKey | null>(null)
   const [ascending, setAscending] = useState(true)

@@ -1,5 +1,6 @@
 import { CloseButton, Heading, Text, Tray } from '@instructure/ui/v11_7'
-import { TODO_GROUPS } from './reviewCopyData'
+import StatusPill from './StatusPill'
+import { TODO_GROUPS, groupTodo, tagOf } from './reviewCopyData'
 import type { TodoItem } from './rolloverData'
 import { useSurfaceTokens } from './appTheme'
 
@@ -25,9 +26,20 @@ export function TodoList({ todo }: { todo: TodoItem[] }) {
             </Heading>
             {/* Rows like a table, but a plain list: a line between the rows, no bullets, no indent. */}
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, borderBlockStart: `${t.borderWidth} solid ${t.borderColor}` }}>
-              {items.map((x, i) => (
+              {/* An item with more than one problem is one entry: its problems, then where it is, once. */}
+              {groupTodo(items).map((grp, i) => (
                 <li key={i} style={{ padding: `${t.space.sm} 0`, borderBlockEnd: `${t.borderWidth} solid ${t.borderColor}` }}>
-                  <Text>{x.title}</Text>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+                    {grp.entries.map((x, n) => (
+                      <div key={n}>
+                        {tagOf(x) && <div style={{ marginBottom: t.space.xs }}><StatusPill size="xs" color={tagOf(x)!.tone}>{tagOf(x)!.tag}</StatusPill></div>}
+                        <Text as="div">{x.title}</Text>
+                        {/* Entries about one part of the course share the line below. The others say what to do themselves. */}
+                        {!grp.content && x.detail && <Text as="div" size="small" color="secondary">{x.detail}</Text>}
+                      </div>
+                    ))}
+                  </div>
+                  {grp.content && <Text as="div" size="small" color="secondary">{grp.content}</Text>}
                 </li>
               ))}
             </ul>

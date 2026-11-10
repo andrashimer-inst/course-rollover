@@ -11,20 +11,21 @@ import {
 } from "@instructure/ui/v11_7";
 import DesktopWrapper from "./DesktopWrapper";
 import ContentStep from "./ContentStep";
-import { nothingPicked } from "./contentHelpers";
+import { nothingPicked, withPulledIn } from "./contentHelpers";
 import type { CopyMode, Picked, Scope } from "./contentHelpers";
 import ReadinessLoading from "./ReadinessLoading";
-import RulesModal from "./RulesModal";
 import SelectCourseStep from "./SelectCourseStep";
 import FixDatesStep from "./FixDatesStep";
 import ReviewAndCopyStep from "./ReviewAndCopyStep";
 import { buildHistory } from "./copyHistory";
-import { INITIAL_OPENING, buildTodo, dimensionsOf, openingLabel, readiness } from "./reviewCopyData";
+import { INITIAL_OPENING, buildTodo, dimensionsOf, failedTodo, openingLabel, readiness } from "./reviewCopyData";
 import type { Opening } from "./reviewCopyData";
 import { DATE_ITEMS, INITIAL_DATES, dateCounts } from "./fixDatesData";
+import type { Included } from "./fixDatesData";
 import type { FixDatesState } from "./fixDatesData";
 import LearningObjectReview from "./LearningObjectReview";
-import { buildRows, choiceOf, hiddenModules } from "./reviewData";
+import { buildRows, choiceOf, hiddenModules, itemIdOf } from "./reviewData";
+import { CONTENT_TYPES } from "./courseContentData";
 import type { Choice, DupeChoice } from "./reviewData";
 import type { CourseNav } from "./GlobalNav";
 import { useAppThemeKey, useSurfaceTokens } from "./appTheme";
@@ -38,7 +39,7 @@ import type { CopySummary, EducatorComment } from "./rolloverData";
 
 // The copy wizard. It opens when someone starts a copy, so the review happens before the copy
 // (discovery priority 1), not after it. Each step has a name that says what it covers:
-//   Learning object review  each item checked against the design rules and the team's comments, with a choice per item
+//   Learning object review  each item checked against the readiness criteria and the team's comments, with a choice per item
 //   Fix dates        deadlines for the new term, with a preview and warnings (priority 7)
 //   Review and copy  readiness check, final preview and a to-do list. The copy starts here
 //   Summary          what was copied and what wasn't (priority 2)
@@ -60,7 +61,7 @@ const STEP_INFO: Record<StepId, { name: string; hint: string; lead: string }> =
     review: {
       name: "Learning object review",
       hint: "Check each item",
-      lead: "Each item is checked against the course design rules and your team's comments. Choose what to do with each one before it is copied.",
+      lead: "Review what the check found. For each item, include it in the copy, leave it out, or add it to your to-do list.",
     },
     dates: {
       name: "Fix dates",
@@ -237,15 +238,16 @@ export default function RolloverWizard({
   // What the educator chose for each learning object, and which of two similar modules to keep.
   const [choices, setChoices] = useState<Record<string, Choice>>(draft?.choices ?? {});
   const [dupes, setDupes] = useState<Record<string, DupeChoice>>(draft?.dupes ?? {});
-  // The rules the educator switched off for the readiness check. They give no findings and are not in the check.
-  const [offRules, setOffRules] = useState<string[]>([]);
-  // The rules ticked in the checker window, which opens after step 2. They count once the educator chooses Analyze.
-  const [draftOff, setDraftOff] = useState<string[]>([]);
-  const [rulesOpen, setRulesOpen] = useState(false);
   const rows = useMemo(
-    () => buildRows(scope ?? "whole", picked, comments, offRules),
-    [scope, picked, comments, offRules],
+    () => buildRows(scope ?? "whole", picked, comments),
+    [scope, picked, comments],
   );
+  // The learning objects that are copied: the ones chosen in step 2, without the ones left out in step 3. The dates step lists only these.
+  const included = useMemo<Included>(() => {
+    const eff = withPulledIn(picked);
+    const left = new Set(rows.filter((r) => choiceOf(r, choices) === "leave").map(itemIdOf));
+    return (id) => (scope !== "part" || !!eff[id]) && !left.has(id);
+  }, [scope, picked, rows, choices]);
   // Choosing another course starts the review over.
   const [reviewedFor, setReviewedFor] = useState(draft?.course ?? "");
   if (reviewedFor !== course) {
@@ -271,14 +273,14 @@ export default function RolloverWizard({
       text: r.findings[0]?.rule.title ?? r.note?.text ?? "Check it after the copy.",
     });
     const left = rows
-      .filter((r) => !r.extra && choiceOf(r, choices) === "leave")
+      .filter((r) => !r.extra && !r.courseWide && choiceOf(r, choices) === "leave")
       .map(asItem);
     const fixLater = rows
       .filter((r) => choiceOf(r, choices) === "fix")
       .map(asItem);
-    const { shifted, edited } = dateCounts(dates);
-    // The broken links are fixed in the learning object review now. The AI fix swaps them in the pages.
-    const linksFixed = rows.some((r) => r.id === "course:links" && ['aifix', 'aicheck'].includes(choiceOf(r, choices) as string));
+    const { shifted, edited } = dateCounts(dates, included);
+    // The broken links are on the to-do list when the educator chose so in the review.
+    const linksFixed = false;
     const types = new Set(fixLater.map((c) => AREA_TO_TYPE[c.area]));
     const came = COPIED_COUNTS.map((c) => ({
       type: c.type,
@@ -308,7 +310,7 @@ export default function RolloverWizard({
         created: rows.filter((r) => !r.courseWide && !r.extra && choiceOf(r, choices) !== "leave").length,
         relinked: 3,
         sentToAdmin: 1,
-        datesPlaced: dates.mode === "clear" || !adjustDates ? 0 : DATE_ITEMS.length,
+        datesPlaced: dates.mode === "clear" || !adjustDates ? 0 : DATE_ITEMS.filter((i) => included(i.itemId)).length,
       },
       history: buildHistory({ rows, choices, opens: opening.mode === "open" ? openingLabel(opening) : "you publish it" }),
       came,
@@ -340,9 +342,9 @@ export default function RolloverWizard({
         },
       ],
       todo: [
-        ...FAILED_ITEMS.map((f) => ({ group: "Fix after the copy", title: `Copy failed: ${f.item}`, detail: f.fix })),
+        ...FAILED_ITEMS.map(failedTodo),
         // The list is gathered from the choices made in the steps before.
-        ...buildTodo({ rows, choices, ready: readiness(rows, choices, offRules), dates, comments, opening }),
+        ...buildTodo({ rows, choices, dates, comments, opening, included }),
       ],
       datesShifted: adjustDates ? shifted : 0,
       datesEdited: adjustDates ? edited : 0,
@@ -353,7 +355,7 @@ export default function RolloverWizard({
     dates,
     comments,
     opening,
-    offRules,
+    included,
     adjustDates,
     courseNav.name,
     course,
@@ -418,8 +420,8 @@ export default function RolloverWizard({
 
   // The to-do list so far. It follows the choices, so the review step can show it while the choices are made.
   const todoNow = useMemo(
-    () => buildTodo({ rows, choices, ready: readiness(rows, choices, offRules), dates, comments, opening }),
-    [rows, choices, dates, comments, opening, offRules],
+    () => buildTodo({ rows, choices, dates, comments, opening, included }),
+    [rows, choices, dates, comments, opening, included],
   );
 
   const [todoOpen, setTodoOpen] = useState(false);
@@ -521,27 +523,16 @@ export default function RolloverWizard({
       <div
         style={{ display: "flex", flexDirection: "column", gap: t.space.xl }}
       >
-        <RulesModal
-          open={rulesOpen}
-          off={draftOff}
-          setOff={setDraftOff}
-          onClose={() => setRulesOpen(false)}
-          onAnalyze={() => {
-            setRulesOpen(false);
-            setOffRules(draftOff);
-            setLoadingContent(true);
-          }}
-        />
         <Stepper steps={steps} current={step} reached={reached} onGo={go} />
         {loadingContent ? (
           // The wait after step 2 is the course readiness check, the same as the check in steps 3 and 5.
           <div style={{ display: "flex", flexDirection: "column", gap: t.space.lg, padding: `${t.space.xl} 0` }}>
             <div style={{ display: "flex", flexDirection: "column", gap: t.space.sm }}>
               <Text as="div" weight="bold" size="large">Course readiness check</Text>
-              <Text as="div" color="secondary">The check uses the course design rules and your choices.</Text>
+              <Text as="div" color="secondary">The check goes through the readiness criteria of your account.</Text>
             </div>
             <ReadinessLoading
-              areas={dimensionsOf(readiness(rows, choices, offRules)).map((g) => g.dimension)}
+              areas={dimensionsOf(readiness(rows, choices)).map((g) => g.dimension)}
               onDone={finishLoading}
             />
           </div>
@@ -591,10 +582,6 @@ export default function RolloverWizard({
             )}
             {id === "review" && (
               <LearningObjectReview
-                offRules={offRules}
-                setOffRules={setOffRules}
-                draftOff={draftOff}
-                setDraftOff={setDraftOff}
                 rows={rows}
                 choices={choices}
                 setChoices={setChoices}
@@ -607,11 +594,20 @@ export default function RolloverWizard({
               />
             )}
             {id === "dates" && (
-              <FixDatesStep state={dates} setState={setDates} todoCount={todoNow.length} onToggleTodo={() => setTodoOpen((o) => !o)} />
+              <FixDatesStep
+                included={included}
+                preview={{
+                  moduleIds: CONTENT_TYPES.find((c) => c.id === 'modules')!.items.filter((m) => scope === 'whole' || picked[m.id]).map((m) => m.id),
+                  keepCurrent: scope === 'part' && mode === 'merge',
+                  hidden: hiddenModules(dupes),
+                  scope: scope ?? 'whole',
+                  picked,
+                }}
+                courseName={course ?? ''} opening={opening} setOpening={setOpening} state={dates} setState={setDates} todoCount={todoNow.length} onToggleTodo={() => setTodoOpen((o) => !o)} />
             )}
             {id === "copy" && (
               <ReviewAndCopyStep
-                offRules={offRules}
+                included={included}
                 rows={rows}
                 choices={choices}
                 scope={scope ?? "whole"}
@@ -622,7 +618,6 @@ export default function RolloverWizard({
                 readyRan={readyRan}
                 setReadyRan={setReadyRan}
                 opening={opening}
-                setOpening={setOpening}
                 todoCount={todoNow.length}
                 onToggleTodo={() => setTodoOpen((o) => !o)}
               />
@@ -669,7 +664,7 @@ export default function RolloverWizard({
                   color="primary"
                   onClick={() =>
                     id === "content"
-                      ? setRulesOpen(true)
+                      ? setLoadingContent(true)
                       : id === "review" && undecided.length > 0
                         ? (setBringInfo({ count: undecided.length, none: Object.keys(choices).length === 0 }), setConfirmBring(true))
                         : go(step + 1)
@@ -689,22 +684,22 @@ export default function RolloverWizard({
           </div>
         </div>
       </div>
-      <Modal open={confirmBring} onDismiss={() => setConfirmBring(false)} size="small" label="Keep everything" shouldCloseOnDocumentClick={false}>
+      <Modal open={confirmBring} onDismiss={() => setConfirmBring(false)} size="small" label="Include everything" shouldCloseOnDocumentClick={false}>
         <Modal.Header>
           <CloseButton placement="end" offset="small" onClick={() => setConfirmBring(false)} screenReaderLabel="Close" />
-          <Heading level="h2">Keep everything?</Heading>
+          <Heading level="h2">Include everything?</Heading>
         </Modal.Header>
         <Modal.Body>
           <Text as="p">
             {bringInfo.none
-              ? `You haven't chosen anything in the review. If you continue, the ${bringInfo.count} items with no choice are copied as they are, with no fixes and nothing left out.`
-              : `${bringInfo.count} ${bringInfo.count === 1 ? "item has" : "items have"} no choice yet. If you continue, ${bringInfo.count === 1 ? "it comes" : "they come"} over as ${bringInfo.count === 1 ? "it is" : "they are"}, with no fixes. The choices you made stay.`}
+              ? `You haven't chosen anything in the review. If you continue, the ${bringInfo.count} items with no choice are included in the copy as they are, and nothing is left out.`
+              : `${bringInfo.count} ${bringInfo.count === 1 ? "item has" : "items have"} no choice yet. If you continue, ${bringInfo.count === 1 ? "it is" : "they are"} included in the copy as ${bringInfo.count === 1 ? "it is" : "they are"}. The choices you made stay.`}
           </Text>
         </Modal.Body>
         <Modal.Footer>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <Button onClick={() => setConfirmBring(false)}>Back to the review</Button>
-            <Button color="primary" onClick={bringAsIs}>Keep and continue</Button>
+            <Button color="primary" onClick={bringAsIs}>Include and continue</Button>
           </div>
         </Modal.Footer>
       </Modal>

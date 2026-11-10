@@ -1,4 +1,5 @@
 import { addDays, daysBetween } from './rolloverData'
+import { CONTENT_TYPES, MODULE_ENTRIES } from './courseContentData'
 
 // Sample data for the "Fix dates" step. Everything here is made up.
 // Fall 2026 dates are all weekdays, because nothing was taught on a weekend. The items, their Fall 2026 dates and the Spring 2027 dates follow the screens of the dates flow:
@@ -8,32 +9,54 @@ const d = (y: number, m: number, day: number) => new Date(y, m - 1, day)
 
 // `skew` is the number of days the item sits off its weekday in the new term, because it was set by hand or comes from
 // the college calendar. It is what makes two dates land on a closed day in each option (a weekend or spring break).
-export type DateItem = { id: string; title: string; kind: string; module: string; old: Date; skew?: number; time?: string }
+// `itemId` is the learning object of the course the date belongs to, so a row only shows when that object is copied.
+// A group discussion can have a different date for each group, so every group has a row of its own.
+export type DateItem = { id: string; itemId: string; title: string; kind: string; module: string; old: Date; skew?: number; time?: string }
 
+const WEEK1 = 'Week 1: Reading and responses'
+const WEEK2 = 'Week 2: Project proposal'
+const WEEK3 = 'Week 3: Reflection and review'
+const NONE = 'Not in a module'
+
+// The learning objects of the course that have a due or event date. `skew` puts a few of them on a weekend in the new term.
 export const DATE_ITEMS: DateItem[] = [
-  { id: 'quiz1', title: 'Quiz 1', kind: 'Quiz', module: 'Module 2: Cells', old: d(2026, 9, 4) },
-  { id: 'quiz3', title: 'Quiz 3: Membranes', kind: 'Quiz', module: 'Module 3: Membranes', old: d(2026, 9, 11) },
-  { id: 'lab1', title: 'Lab report 1', kind: 'Assignment', module: 'Module 3: Membranes', old: d(2026, 9, 18) },
-  // A group discussion can have a different date for each group, so every group has a row of its own. Group B was set by hand
-  // to a day that is a Saturday in the new term.
-  { id: 'debate-a', title: 'Case study debate', kind: 'Group discussion · Group A', module: 'Module 3: Membranes', old: d(2026, 9, 24) },
-  { id: 'debate-b', title: 'Case study debate', kind: 'Group discussion · Group B', module: 'Module 3: Membranes', old: d(2026, 10, 1), skew: 2 },
-  { id: 'debate-c', title: 'Case study debate', kind: 'Group discussion · Group C', module: 'Module 3: Membranes', old: d(2026, 10, 8) },
-  { id: 'energy', title: 'Energy essay', kind: 'Assignment', module: 'Module 4: Energy', old: d(2026, 9, 25), skew: 2 },
-  { id: 'lab3', title: 'Lab session 3', kind: 'Event', module: 'Module 4: Energy', old: d(2026, 9, 21), time: '14:00' },
-  { id: 'midterm', title: 'Midterm exam', kind: 'Quiz', module: 'Module 5: Genetics basics', old: d(2026, 10, 13), skew: -6, time: '15:00' },
-  { id: 'practice', title: 'Practice quiz', kind: 'Quiz', module: 'Module 6: Review week', old: d(2026, 10, 26) },
-  { id: 'brief', title: 'Final project brief', kind: 'Assignment', module: 'Module 7: Final project', old: d(2026, 12, 4) },
-  { id: 'present', title: 'Final presentation', kind: 'Event', module: 'Module 7: Final project', old: d(2026, 12, 3), time: '16:30' },
+  { id: 'a1', itemId: 'assignments:1', title: 'Assignment 1: Reading response', kind: 'Assignment', module: WEEK1, old: d(2026, 9, 9) },
+  { id: 'q1', itemId: 'quizzes:1', title: 'Quiz 1', kind: 'Quiz', module: WEEK1, old: d(2026, 9, 16) },
+  { id: 'e3', itemId: 'events:3', title: 'Office hours', kind: 'Event', module: NONE, old: d(2026, 9, 22), time: '15:00' },
+  { id: 'a2', itemId: 'assignments:2', title: 'Project proposal', kind: 'Assignment', module: WEEK2, old: d(2026, 10, 7) },
+  { id: 'debate-a', itemId: 'discussions:2', title: 'Week 3 discussion', kind: 'Group discussion · Group A', module: WEEK2, old: d(2026, 10, 8) },
+  { id: 'debate-b', itemId: 'discussions:2', title: 'Week 3 discussion', kind: 'Group discussion · Group B', module: WEEK2, old: d(2026, 10, 9), skew: 1 },
+  { id: 'debate-c', itemId: 'discussions:2', title: 'Week 3 discussion', kind: 'Group discussion · Group C', module: WEEK2, old: d(2026, 10, 14) },
+  { id: 'a3', itemId: 'assignments:3', title: 'Assignment 3: Reflection', kind: 'Assignment', module: WEEK3, old: d(2026, 10, 14), skew: 2 },
+  { id: 'e1', itemId: 'events:1', title: 'Guest speaker', kind: 'Event', module: NONE, old: d(2026, 10, 15), time: '14:00' },
+  { id: 'q2', itemId: 'quizzes:2', title: 'Quiz 2', kind: 'Quiz', module: WEEK3, old: d(2026, 10, 21) },
+  { id: 'a4', itemId: 'assignments:4', title: 'Peer review', kind: 'Assignment', module: NONE, old: d(2026, 10, 28), skew: -6, time: '15:00' },
+  { id: 'q3', itemId: 'quizzes:3', title: 'Quiz 3', kind: 'Quiz', module: NONE, old: d(2026, 11, 11) },
+  { id: 'e2', itemId: 'events:2', title: 'Portfolio review day', kind: 'Event', module: NONE, old: d(2026, 11, 18), time: '10:00' },
+  { id: 'e4', itemId: 'events:4', title: 'Final presentations', kind: 'Event', module: NONE, old: d(2026, 12, 3), time: '16:30' },
+  { id: 'a5', itemId: 'assignments:5', title: 'Final portfolio', kind: 'Assignment', module: NONE, old: d(2026, 12, 4) },
 ]
 
 // Items that have no due date in the old course. They stay empty, or the teacher sets them to the last day of the course.
-export type NoDateItem = { id: string; title: string; kind: string; module: string }
-export const NO_DATE_ITEMS: NoDateItem[] = [
-  { id: 'reflection', title: 'Reading reflection', kind: 'Assignment', module: 'Module 2: Cells' },
-  { id: 'checkin', title: 'Weekly check-in', kind: 'Discussion', module: 'Module 4: Energy' },
-  { id: 'survey', title: 'Extra credit survey', kind: 'Quiz', module: 'Module 6: Review week' },
-]
+// `dateable` is for the kinds that can have a due date (assignments, quizzes, discussions, events). A page or a file shows as
+// having no due date, and there is nothing to set.
+export type NoDateItem = { id: string; itemId: string; title: string; kind: string; module: string; dateable: boolean }
+const KIND_OF: Record<string, string> = { settings: 'Settings', syllabus: 'Syllabus', assignments: 'Assignment', quizzes: 'Quiz', banks: 'Question bank', discussions: 'Discussion', pages: 'Page', announcements: 'Announcement', rubrics: 'Rubric', outcomes: 'Outcome', files: 'File', events: 'Event' }
+const DATEABLE = new Set(['assignments', 'quizzes', 'discussions', 'events'])
+const moduleOfItem = (id: string) => {
+  const m = CONTENT_TYPES.find((c) => c.id === 'modules')!.items.find((mod) => (MODULE_ENTRIES[mod.id] ?? []).some((e) => e.itemId === id))
+  return m?.label ?? NONE
+}
+// Every other learning object of the course: the ones with no date in the old course.
+export const NO_DATE_ITEMS: NoDateItem[] = CONTENT_TYPES.filter((c) => c.id !== 'modules').flatMap((c) =>
+  (c.items.length ? c.items : [{ id: c.id, label: c.label }])
+    .filter((i) => !DATE_ITEMS.some((x) => x.itemId === i.id))
+    .map((i) => ({ id: `n-${i.id}`, itemId: i.id, title: i.label, kind: KIND_OF[c.id] ?? c.label, module: moduleOfItem(i.id), dateable: DATEABLE.has(c.id) })),
+)
+
+// Which learning objects are copied. A date row shows only for those. Without a filter, every row shows.
+export type Included = (itemId: string) => boolean
+export const all: Included = () => true
 // 'empty' keeps the item without a date, 'last' gives it the last day of the course, and a date (YYYY-MM-DD) is one picked by hand.
 export type NoDateChoice = string
 // The last day of the course: the last Friday of the old term, placed in the new term like the other dates.
@@ -109,6 +132,8 @@ export type FixDatesState = {
   rows: Record<string, RowChoice>
   // What the items with no due date get. Missing means they stay empty.
   noDate: Record<string, NoDateChoice>
+  // The due time (HH:MM, UTC) the educator set by hand for an item. Without one, the item keeps its own time.
+  times?: Record<string, string>
 }
 export const INITIAL_DATES: FixDatesState = { mode: 'calendar', startText: '2027-01-25', fixAll: '', rows: {}, noDate: {} }
 
@@ -162,9 +187,9 @@ export function rowInfo(item: DateItem, state: FixDatesState): DateRowInfo {
 }
 
 // For the summary: how many dates moved to the new term as placed, and how many the teacher changed.
-export function dateCounts(state: FixDatesState): { shifted: number; edited: number } {
+export function dateCounts(state: FixDatesState, included: Included = all): { shifted: number; edited: number } {
   if (state.mode === 'clear') return { shifted: 0, edited: 0 }
-  const infos = DATE_ITEMS.map((item) => rowInfo(item, state))
+  const infos = DATE_ITEMS.filter((i) => included(i.itemId)).map((item) => rowInfo(item, state))
   const edited = infos.filter((r) => r.final && r.final.toDateString() !== r.base.toDateString()).length
   return { shifted: infos.length - edited, edited }
 }

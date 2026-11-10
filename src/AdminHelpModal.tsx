@@ -17,7 +17,10 @@ import {
   TextArea,
   TextInput,
 } from '@instructure/ui/v11_7'
-import type { ReviewRow } from './reviewData'
+// What the message is about: a title and what is wrong or left to do. Review rows and to-do entries both fit.
+export type HelpItem = { title: string; detail: string }
+// The recipient, subject and text of a message that is not the one to the admin. `message` gets the list of items.
+export type MessageDraft = { to: string; subject: string; message: (list: string) => string }
 
 // One message to the admin about the whole review. It opens from the "Message admin" button above the table.
 // It is the Canvas "Compose Message" window, without the course and the individual-message checkbox: the "To" field is
@@ -27,29 +30,31 @@ import type { ReviewRow } from './reviewData'
 const LANGUAGES = ['Spanish', 'French', 'German', 'Portuguese', 'Hungarian', 'Arabic', 'Simplified Chinese']
 
 export default function AdminHelpModal({
-  open, items, onClose, onSend,
+  open, items, onClose, onSend, draft,
 }: {
   open: boolean
   // The items the message is about: the ones with a finding.
-  items: ReviewRow[]
+  items: HelpItem[]
   onClose: () => void
   onSend: () => void
+  // Another message in the same window, like the to-do list sent to the educator. The message to the admin when not set.
+  draft?: MessageDraft
 }) {
   return (
     <Modal open={open} onDismiss={onClose} size="medium" label="Compose Message" shouldCloseOnDocumentClick={false}>
-      {open && <Form items={items} onClose={onClose} onSend={onSend} />}
+      {open && <Form items={items} onClose={onClose} onSend={onSend} draft={draft} />}
     </Modal>
   )
 }
 
-function Form({ items, onClose, onSend }: { items: ReviewRow[]; onClose: () => void; onSend: () => void }) {
+function Form({ items, onClose, onSend, draft }: { items: HelpItem[]; onClose: () => void; onSend: () => void; draft?: MessageDraft }) {
   const list = items
-    .map((r) => `- ${r.title}: ${r.findings.map((f) => f.detail).join(' ') || r.note?.text || 'Needs a look.'}`)
+    .map((r) => `- ${r.title}: ${r.detail || 'Needs a look.'}`)
     .join('\n')
-  const [to, setTo] = useState('Your admin')
-  const [subject, setSubject] = useState('Help with the course copy')
+  const [to, setTo] = useState(draft?.to ?? 'Your admin')
+  const [subject, setSubject] = useState(draft?.subject ?? 'Help with the course copy')
   const [message, setMessage] = useState(
-    `Hi,\n\nI am copying content into my course and the review found problems I need help with.\n\n${list}\n\nCan you help me fix them before the term starts?\n\nThank you`,
+    draft ? draft.message(list) : `Hi,\n\nI am copying content into my course and the review found problems I need help with.\n\n${list}\n\nCan you help me fix them before the term starts?\n\nThank you`,
   )
   const [translate, setTranslate] = useState(false)
   const [language, setLanguage] = useState('')
