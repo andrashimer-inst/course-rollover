@@ -19,7 +19,10 @@ import {
   View,
 } from '@instructure/ui/v11_7'
 import StatusPill from './StatusPill'
+import ReadinessLoading from './ReadinessLoading'
+import { dimensionsOf, readiness } from './reviewCopyData'
 import AdminHelpModal from './AdminHelpModal'
+import RulesModal from './RulesModal'
 import type { TodoItem } from './rolloverData'
 import { CoursePreview } from './ContentStep'
 import { CONTENT_TYPES, MODULE_ENTRIES } from './courseContentData'
@@ -45,8 +48,14 @@ const FILTERS: [Filter, string][] = [
 const MODULES = CONTENT_TYPES.find((c) => c.id === 'modules')!.items
 
 export default function LearningObjectReview({
-  rows, choices, setChoices, scope, mode, picked, dupes, todo, onToggleTodo,
+  rows, choices, setChoices, scope, mode, picked, dupes, todo, onToggleTodo, offRules, setOffRules, draftOff, setDraftOff,
 }: {
+  // The rules the educator switched off for the readiness check.
+  offRules: string[]
+  setOffRules: (ids: string[]) => void
+  // The rules ticked in the checker window. They only count for the findings once the course is analyzed.
+  draftOff: string[]
+  setDraftOff: (ids: string[]) => void
   rows: ReviewRow[]
   choices: Record<string, Choice>
   setChoices: (c: Record<string, Choice>) => void
@@ -73,6 +82,9 @@ export default function LearningObjectReview({
 
   const done = (r: ReviewRow) => choiceOf(r, choices) !== undefined
   const [tab, setTab] = useState(0)
+  const [checking, setChecking] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const rulesChanged = draftOff.length !== offRules.length || draftOff.some((id) => !offRules.includes(id))
   // Learning objects inside a module, and those that are copied on their own. The course preview only shows modules,
   // so the ones on their own are reviewed in a card of their own and do not change the preview.
   const inModule = new Set(Object.values(MODULE_ENTRIES).flatMap((es) => es.map((e) => e.itemId)))
@@ -407,6 +419,9 @@ export default function LearningObjectReview({
       {/* The message and to-do buttons at the end of the row, under the tabs. */}
       <div style={{ marginInlineStart: 'auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md }}>
         {messageSent && <StatusPill size="sm" color="success">Message sent to your admin</StatusPill>}
+        {rulesChanged && <Text size="small" color="secondary">Rules changed. Analyze the course to apply them.</Text>}
+        <Button color={rulesChanged ? 'primary' : 'secondary'} onClick={() => { setOffRules(draftOff); setChecking(true) }}>Analyze course</Button>
+        <Button onClick={() => setRulesOpen(true)}>Rules</Button>
         <Button renderIcon={<IconEmailLine />} onClick={() => setHelpOpen(true)}>Message admin</Button>
         <Button renderIcon={<IconAssignmentLine />} onClick={onToggleTodo}>To-do list ({todo.length})</Button>
       </div>
@@ -415,6 +430,17 @@ export default function LearningObjectReview({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg }}>
+      {/* Running the readiness check shows the same loading as the wait after step 2. */}
+      {checking && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.lg, padding: `${t.space.xl} 0` }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+            <Text as="div" weight="bold" size="large">Course readiness check</Text>
+            <Text as="div" color="secondary">The check uses the course design rules and your choices.</Text>
+          </div>
+          <ReadinessLoading areas={dimensionsOf(readiness(rows, choices, draftOff)).map((g) => g.dimension)} onDone={() => setChecking(false)} />
+        </div>
+      )}
+      {!checking && (<>
       {/* The tally as small dashboard cards, so the numbers are easy to see at a glance. */}
       <div aria-live="polite" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))', gap: t.space.md }}>
         {([
@@ -500,9 +526,9 @@ export default function LearningObjectReview({
           {filterRow}
           <CoursePreview
             moduleIds={moduleIds}
-            // Only a merge keeps the modules already in the course. A whole-course copy shows just the incoming modules.
+            // Content added by hand always stays. A merge also keeps the modules from earlier copies.
             keepCurrent={merging}
-            highlightNew={scope === 'part'}
+            highlightNew
             hidden={hiddenModules(dupes)}
             // Each item shows what was chosen for it in this step, including "Keep" for items that are copied by default. Items still to decide show nothing.
             noteFor={(itemId) => {
@@ -518,6 +544,8 @@ export default function LearningObjectReview({
           </div>
         </Tabs.Panel>
       </Tabs>
+      </>)}
+      <RulesModal open={rulesOpen} off={draftOff} setOff={setDraftOff} onClose={() => setRulesOpen(false)} onAnalyze={() => { setRulesOpen(false); setOffRules(draftOff); setChecking(true) }} />
       <AdminHelpModal open={helpOpen} items={rows.filter((r) => r.hasSuggestion && !done(r)).length ? rows.filter((r) => r.hasSuggestion && !done(r)) : rows.filter((r) => r.hasSuggestion)} onClose={() => setHelpOpen(false)} onSend={() => setMessageSent(true)} />
     </div>
   )

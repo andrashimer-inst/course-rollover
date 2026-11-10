@@ -11,6 +11,7 @@ import {
   IconFolderLine,
   IconQuizLine,
   RadioInput,
+  SimpleSelect,
   Text,
   Tooltip,
   View,
@@ -21,9 +22,15 @@ import type { CopyMode, Picked, Scope } from './contentHelpers'
 import type { ModuleEntry } from './courseContentData'
 import FigmaAlert from './FigmaAlert'
 import SegmentedControl from './SegmentedControl'
+import StatusPill from './StatusPill'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
 const MODULES = CONTENT_TYPES.find((c) => c.id === 'modules')!.items
+// The list to tick from: the single things (no list under them) first, then the rest, each part in alphabetical order.
+// One description for both views of the step 2 preview. It does not change with the choices.
+const PREVIEW_DESCRIPTION = 'The course as it will look after the copy.'
+
+const SORTED_TYPES = [...CONTENT_TYPES].sort((a, b) => Number(a.items.length > 0) - Number(b.items.length > 0) || a.label.localeCompare(b.label))
 
 // Step 2 of the copy wizard: content to copy. Two cards to choose from: the whole course, or part of it.
 // "Part of it" opens a list of learning objects to tick. Whenever modules are copied, a preview shows how the course looks.
@@ -53,12 +60,24 @@ export default function ContentStep({
   const picked = withPulledIn(chosen)
   const pulled = pulledInBy(chosen)
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [previewTab, setPreviewTab] = useState(0)
 
   const setKeys = (ks: string[], on: boolean) => setPicked({ ...chosen, ...Object.fromEntries(ks.map((k) => [k, on])) })
   const allKeys = CONTENT_TYPES.flatMap(keys)
   const allCount = allKeys.filter((k) => picked[k]).length
 
   const comingModules = scope === 'whole' ? MODULES : MODULES.filter((m) => picked[m.id])
+  const keepCurrent = scope === 'part' && mode === 'merge'
+  const viewSelect = (
+    <SimpleSelect
+      renderLabel="View"
+      value={String(previewTab)}
+      onChange={(_e, { value }) => setPreviewTab(Number(value))}
+    >
+      <SimpleSelect.Option id="view-modules" value="0">Modules</SimpleSelect.Option>
+      <SimpleSelect.Option id="view-objects" value="1">Learning objects</SimpleSelect.Option>
+    </SimpleSelect>
+  )
 
   const card = (id: Scope, title: string, body: ReactNode, extra?: ReactNode) => {
     const on = scope === id
@@ -113,14 +132,14 @@ export default function ContentStep({
           `${MODULES.length} modules and all learning objects.`,
 (
             <FigmaAlert variant="warning" type="inline">
-              Copying the whole course replaces the content that is in this course now.
+              Copying the whole course replaces the content copied here before. Content you added yourself stays in the course.
             </FigmaAlert>
           ),
         )}
         {card(
           'part',
           'Part of it',
-          CONTENT_TYPES.map((c) => c.label).join(', ') + '.',
+          SORTED_TYPES.map((c) => c.label).join(', ') + '.',
           (
             <div onClick={(e) => e.stopPropagation()}>
               <div>
@@ -129,10 +148,17 @@ export default function ContentStep({
                   value={mode}
                   onChange={(v) => setMode(v as CopyMode)}
                   options={[
-                    { value: 'merge', label: 'Merge it with the current content' },
-                    { value: 'replace', label: 'Replace the current content' },
+                    { value: 'merge', label: 'Add to the current content' },
+                    { value: 'replace', label: 'Replace the copied content' },
                   ]}
                 />
+              </div>
+              <div style={{ marginTop: t.space.sm }}>
+                <Text as="div" size="small" color="secondary">
+                  {mode === 'replace'
+                    ? 'Replaces what an earlier copy added. Content you added yourself stays.'
+                    : 'Keeps everything that is in the course now, including earlier copies.'}
+                </Text>
               </div>
             </div>
           ),
@@ -160,7 +186,7 @@ export default function ContentStep({
               indeterminate={allCount > 0 && allCount < allKeys.length}
               onChange={() => setKeys(allKeys, allCount < allKeys.length)}
             />
-            {CONTENT_TYPES.map((type) => {
+            {SORTED_TYPES.map((type) => {
               const ks = keys(type)
               const n = countPicked(type, picked)
               const expanded = !!open[type.id]
@@ -228,9 +254,14 @@ export default function ContentStep({
         </div>
       )}
 
-      {(comingModules.length > 0 || (scope === 'part' && mode === 'merge')) && (
+      {scope && (
         <div style={{ flex: '1 1 24rem', minWidth: 0 }}>
-          <CoursePreview moduleIds={comingModules.map((m) => m.id)} keepCurrent={scope === 'part' && mode === 'merge'} highlightNew={scope === 'part'} hidden={hidden} titleSize="medium" />
+          {/* Two ways to look at the same copy, chosen with the dropdown inside the card: by module, or by learning object. */}
+          {previewTab === 0 ? (
+            <CoursePreview moduleIds={comingModules.map((m) => m.id)} keepCurrent={keepCurrent} highlightNew hidden={hidden} titleSize="medium" description={PREVIEW_DESCRIPTION} headerExtra={viewSelect} />
+          ) : (
+            <ObjectsPreview scope={scope} picked={picked} keepCurrent={keepCurrent} description={PREVIEW_DESCRIPTION} headerExtra={viewSelect} />
+          )}
         </div>
       )}
       </div>
@@ -238,9 +269,67 @@ export default function ContentStep({
   )
 }
 
+const KIND_TYPE: Record<ModuleEntry['kind'], string> = { assignment: 'assignments', quiz: 'quizzes', page: 'pages', discussion: 'discussions', file: 'files' }
+
+// The same copy, listed by learning object instead of by module. Each type is a group. Every row says where it comes from.
+function ObjectsPreview({ scope, picked, keepCurrent, description, headerExtra }: { scope: Scope; picked: Picked; keepCurrent: boolean; description: string; headerExtra?: ReactNode }) {
+  const t = useSurfaceTokens()
+  const legacy = useAppThemeKey() === 'legacy'
+  const groups = SORTED_TYPES.filter((type) => type.id !== 'modules').map((type) => {
+    const coming = (type.items.length ? type.items : [{ id: type.id, label: type.label }])
+      .filter((i) => scope === 'whole' || picked[i.id])
+      .map((i) => ({ id: i.id, label: i.label, origin: 'New' }))
+    const existing = CURRENT_MODULES
+      .filter((m) => keepCurrent || m.source === 'manual')
+      .flatMap((m) => m.entries.filter((e) => KIND_TYPE[e.kind] === type.id).map((e) => ({ id: e.itemId, label: e.title, origin: m.source === 'manual' ? 'Added manually' : 'Copied before' })))
+    return { type, rows: [...existing, ...coming] }
+  }).filter((g) => g.rows.length > 0)
+  const heading = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
+      <Text as="div" weight="bold" size="medium">Preview</Text>
+      <Text as="div" color="secondary">
+        {description}
+      </Text>
+      {headerExtra}
+    </div>
+  )
+  return (
+    <section
+      aria-label="Preview"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: t.space.lg,
+        background: legacy ? undefined : t.containerColor,
+        borderRadius: legacy ? undefined : t.radiusCardMd,
+        boxShadow: legacy ? undefined : t.shadowResting,
+        padding: legacy ? undefined : t.space.lg,
+      }}
+    >
+      {heading}
+      {groups.length === 0 && <Text as="p" color="secondary">No learning objects are selected yet.</Text>}
+      {groups.map(({ type, rows }) => (
+        <div key={type.id} style={{ border: `${t.borderWidth} solid ${t.borderColor}`, borderRadius: legacy ? undefined : t.radiusMd, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: t.space.sm, padding: t.space.md, background: legacy ? 'transparent' : t.pageColor, color: t.textColor }}>
+            <span aria-hidden="true" style={{ display: 'inline-flex' }}>{TYPE_ICON[type.id]}</span>
+            <Text weight="bold">{type.label}</Text>
+            <Text size="small" color="secondary">({rows.length})</Text>
+          </div>
+          {rows.map((r) => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: t.space.md, padding: t.space.md, borderTop: `${t.borderWidth} solid ${t.borderColor}` }}>
+              <span style={{ flex: 1, minWidth: 0 }}><Text as="div">{r.label}</Text></span>
+              <StatusPill size="xs" color={r.origin === 'New' ? 'info' : 'neutral'}>{r.origin}</StatusPill>
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  )
+}
+
 // How the course looks with the modules that are copied: grey module bars with their items under them.
 export function CoursePreview({
-  moduleIds, keepCurrent, highlightNew, hidden, hiddenItems, noteFor, title, titleSize = 'large',
+  moduleIds, keepCurrent, highlightNew, hidden, hiddenItems, noteFor, title, titleSize = 'large', description, headerExtra,
 }: {
   moduleIds: string[]
   keepCurrent: boolean
@@ -254,6 +343,10 @@ export function CoursePreview({
   title?: string | false
   // The size of the title. Step 2 uses the size of the card title beside it.
   titleSize?: 'medium' | 'large'
+  // Replaces the default description (how many modules are copied and what they do to the course).
+  description?: ReactNode
+  // Something under the description inside the card, like the step 2 view switch.
+  headerExtra?: ReactNode
 }) {
   const t = useSurfaceTokens()
   const legacy = useAppThemeKey() === 'legacy'
@@ -262,8 +355,9 @@ export function CoursePreview({
   const toggleModule = (id: string) => setClosed({ ...closed, [id]: !closed[id] })
   // The basic icon color, the same as the text. No green.
   const iconColor = { color: t.textColor }
-  const coming = MODULES.filter((m) => moduleIds.includes(m.id)).map((m) => ({ id: m.id, label: m.label, entries: MODULE_ENTRIES[m.id], isNew: true }))
-  const current = keepCurrent ? CURRENT_MODULES.map((m) => ({ ...m, isNew: false })) : []
+  const coming = MODULES.filter((m) => moduleIds.includes(m.id)).map((m) => ({ id: m.id, label: m.label, entries: MODULE_ENTRIES[m.id], isNew: true, source: 'new' as string }))
+  // Content added by hand always stays. Content from an earlier copy stays only when the new copy is added to it.
+  const current = CURRENT_MODULES.filter((m) => keepCurrent || m.source === 'manual').map((m) => ({ ...m, isNew: false }))
   // Names are kept as they are, so two modules can have the same name.
   const list = [...current, ...coming].filter((m) => !hidden?.has(m.id))
   // Card title and description: a small gap between them, like the Card component in Figma.
@@ -271,8 +365,9 @@ export function CoursePreview({
     <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm }}>
       {title !== false && <Text as="div" weight="bold" size={titleSize} id="course-preview">{title ?? 'Preview'}</Text>}
       <Text as="div" color="secondary">
-        {moduleIds.length} of {MODULES.length} modules will be copied.{keepCurrent ? '' : ' They replace the current course content.'}
+        {description ?? <>{moduleIds.length} of {MODULES.length} modules will be copied.{keepCurrent ? ' They are added to the content in the course now.' : ' They replace the content copied here before. Content you added yourself stays.'}</>}
       </Text>
+      {headerExtra}
     </div>
   )
   return (
@@ -329,12 +424,10 @@ export function CoursePreview({
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <Text weight="bold" color={m.isNew && highlightNew ? 'primary-inverse' : undefined}>{m.label}</Text>
                 </span>
-                {/* When the copy is merged into the course, each module says if it is already there or is new. */}
-                {keepCurrent && (
-                  <Text size="small" color={m.isNew && highlightNew ? 'primary-inverse' : 'secondary'}>
-                    {m.isNew ? 'New' : 'Existing'}
-                  </Text>
-                )}
+                {/* Each module says where it comes from: the new copy, an earlier copy, or added by hand. */}
+                <Text size="small" color={m.isNew && highlightNew ? 'primary-inverse' : 'secondary'}>
+                  {m.isNew ? 'New' : m.source === 'manual' ? 'Added manually' : 'Copied before'}
+                </Text>
               </button>
             </View>
             {!closed[m.id] && m.entries.filter((e) => !hiddenItems?.has(e.itemId)).map((e) => (

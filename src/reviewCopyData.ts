@@ -25,9 +25,11 @@ const ALL_RULES = [...DESIGN_RULES, ...EXTRA_RULES]
 const FIXED: Choice[] = ['aifix', 'aicheck', 'leave']
 
 // How each rule stands with the choices made so far. The rules are the sheet's, plus the accessibility checks.
-export function readiness(rows: ReviewRow[], choices: Record<string, Choice>): ReadyRule[] {
+// `off` lists the rules the educator switched off. They are left out of the check.
+export function readiness(rows: ReviewRow[], choices: Record<string, Choice>, off: string[] = []): ReadyRule[] {
   const out: ReadyRule[] = []
   for (const rule of ALL_RULES) {
+    if (off.includes(rule.id)) continue
     if (rule.severity === 'pass') {
       out.push({ rule, status: 'pass', note: 'Nothing to change.' })
       continue

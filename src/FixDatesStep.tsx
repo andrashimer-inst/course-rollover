@@ -13,7 +13,7 @@ import {
 import DatePickerButton from './DatePickerButton'
 import FigmaAlert from './FigmaAlert'
 import StatusPill from './StatusPill'
-import { DATE_ITEMS, NO_DATE_ITEMS, fmtShort, lastDayOf, localLabel, parseStart, rowInfo, timeOf, utcLabel } from './fixDatesData'
+import { DATE_ITEMS, FALL_START, NO_DATE_ITEMS, closedName, fmtShort, lastDayOf, localLabel, parseStart, rowInfo, timeOf, utcLabel } from './fixDatesData'
 import type { DateChoice, DateMode, FixDatesState, NoDateChoice } from './fixDatesData'
 import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 
@@ -22,6 +22,12 @@ import { useAppThemeKey, useSurfaceTokens } from './appTheme'
 // holiday or after it. Items on a teaching day are done from the start, and any date can be changed by hand.
 
 const noFill = { background: 'transparent' }
+
+// What makes a day a non-teaching day, in plain words: a weekend day or a holiday.
+const reasonOf = (closed: string) => {
+  const day = closed.replace(/^a /, '')
+  return day === 'Saturday' || day === 'Sunday' ? `${day}, a weekend day` : `${day}, a holiday`
+}
 
 // The first day field and the fix-all dropdown are the same width, wide enough for the longest choice.
 const FIELD_WIDTH = '21rem'
@@ -126,7 +132,8 @@ export default function FixDatesStep({
             renderLabel={<Text weight="bold">First day of the course</Text>}
             value={state.startText}
             onChange={(_e, v) => setState({ ...state, startText: v, fixAll: '', rows: {} })}
-            messages={parseStart(state.startText) ? [] : [{ type: 'newError', text: 'Enter a valid date' }]}
+            // The first day of the old course sits under the field, so the new day can be compared with it.
+            messages={parseStart(state.startText) ? [{ type: 'hint', text: `Fall 2026 started on ${FALL_START.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}` }] : [{ type: 'newError', text: 'Enter a valid date' }]}
           />
     </div>
   )
@@ -171,7 +178,6 @@ export default function FixDatesStep({
         {on && m.id === 'calendar' && (
           <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: t.space.md, marginTop: t.space.lg }}>
             {startField}
-            {fixAll}
           </div>
         )}
       </div>
@@ -210,6 +216,8 @@ export default function FixDatesStep({
                 : `${infos.length} dates to review · ${closedCount === 0 ? 'all on teaching days' : `${closedCount} on a non-teaching day · ${open.length} still to fix`}`}
             </Text>
           </div>
+          {/* Fixes every item on a non-teaching day in one go. It sits under the title and description of the Dates card. */}
+          {!clear && fixAll && <div style={{ marginBottom: t.space.lg }}>{fixAll}</div>}
           <Table caption={() => 'Dates of the items to copy'} themeOverride={noFill}>
             <Table.Head themeOverride={noFill}>
               <Table.Row themeOverride={noFill}>
@@ -251,6 +259,13 @@ export default function FixDatesStep({
                       ) : (
                         <StatusPill size="sm" color="success">Teaching day</StatusPill>
                       )}
+                      {/* A date picked by hand can land on a closed day too. The check says why. */}
+                      {!clear && r.choice?.choice === 'custom' && r.finalClosed && r.finalClosed !== r.closed && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: t.space.sm, marginTop: t.space.sm }}>
+                          <div><StatusPill size="sm" color="warning">Non-teaching day</StatusPill></div>
+                          <Text as="div" weight="bold">Your date is {reasonOf(r.finalClosed)}.</Text>
+                        </div>
+                      )}
                     </Table.Cell>
                     {!clear && (
                       <Table.Cell themeOverride={noFill}>
@@ -266,6 +281,13 @@ export default function FixDatesStep({
                                 {r.choice?.choice === 'custom' && (
                                   <Text as="div" size="small" color="secondary">Changed by you</Text>
                                 )}
+                                {/* A date picked by hand can be a weekend. It is allowed, and flagged. */}
+                                {r.choice?.choice === 'custom' && r.finalClosed && (
+                                  <div style={{ marginTop: t.space.xs, display: 'flex', flexDirection: 'column', gap: t.space.xs, alignItems: 'flex-start' }}>
+                                    <StatusPill size="xs" color="warning">Non-teaching day</StatusPill>
+                                    <Text as="div" size="small" color="secondary">{reasonOf(r.finalClosed)}</Text>
+                                  </div>
+                                )}
                               </>
                             )}
                           </div>
@@ -274,7 +296,9 @@ export default function FixDatesStep({
                             <Tooltip
                               renderTip={
                                 r.finalClosed
-                                  ? 'Not fixed yet. This date is on a non-teaching day.'
+                                  ? r.choice?.choice === 'custom'
+                                    ? 'This date is on a non-teaching day.'
+                                    : 'Not fixed yet. This date is on a non-teaching day.'
                                   : r.closed
                                     ? 'Fixed. The date moved to a teaching day.'
                                     : 'Nothing to fix. This date is on a teaching day.'
@@ -325,6 +349,12 @@ export default function FixDatesStep({
                                 <Text as="div" weight="bold">{fmtShort(date)}</Text>
                                 {pick === 'last' && <Text as="div" size="small" color="secondary">Last day of the course</Text>}
                                 {pick !== 'last' && <Text as="div" size="small" color="secondary">Set by you</Text>}
+                                {date && closedName(date) && (
+                                  <div style={{ marginTop: t.space.xs, display: 'flex', flexDirection: 'column', gap: t.space.xs, alignItems: 'flex-start' }}>
+                                    <StatusPill size="xs" color="warning">Non-teaching day</StatusPill>
+                                    <Text as="div" size="small" color="secondary">{reasonOf(closedName(date) as string)}</Text>
+                                  </div>
+                                )}
                               </>
                             ) : (
                               <Text color="secondary">No date</Text>
