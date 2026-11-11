@@ -1,57 +1,48 @@
 import { DESIGN_RULES, DIMENSIONS } from './designCheckData'
 import type { DesignRule, Dimension } from './designCheckData'
-import { EXTRA_RULES, choiceOf } from './reviewData'
+import { CONTENT_TYPES } from './courseContentData'
+import { RULE_LABEL, choiceOf } from './reviewData'
 import type { Choice, ReviewRow } from './reviewData'
-import { DATE_ITEMS, NO_DATE_ITEMS, rowInfo, fmtShort } from './fixDatesData'
+import { DATE_ITEMS, NO_DATE_ITEMS, all, rowInfo, fmtShort } from './fixDatesData'
+import type { Included } from './fixDatesData'
 import type { FixDatesState } from './fixDatesData'
 import type { EducatorComment, TodoItem } from './rolloverData'
 
 // Sample logic for the "Review and copy" step. Everything here is made up.
-// The readiness check goes through the rules of the "Course Design Rule definitions" sheet and looks at what
-// was decided in the learning object review. The to-do list gathers what is left for the teacher to do by hand.
+// The readiness check goes through the criteria of the account and looks at what was decided in the learning object
+// review. The to-do list gathers what is left for the teacher to do by hand.
 
-export type ReadyStatus = 'pass' | 'fixed' | 'later' | 'manual'
+// pass: nothing found. fixed: left out, or set in another step. later: on the to-do list. open: copied as it is.
+export type ReadyStatus = 'pass' | 'fixed' | 'later' | 'open'
 
 export type ReadyRule = { rule: DesignRule; status: ReadyStatus; note: string }
 
 export const STATUS_LABEL: Record<ReadyStatus, string> = {
   pass: 'Ready',
-  fixed: 'Fixed in the copy',
-  later: 'Fix after the copy',
-  manual: 'Action required',
+  fixed: 'Handled',
+  later: 'On your to-do list',
+  open: 'Copied as it is',
 }
 
-const ALL_RULES = [...DESIGN_RULES, ...EXTRA_RULES]
-const FIXED: Choice[] = ['aifix', 'aicheck', 'leave']
-
-// How each rule stands with the choices made so far. The rules are the sheet's, plus the accessibility checks.
-// `off` lists the rules the educator switched off. They are left out of the check.
-export function readiness(rows: ReviewRow[], choices: Record<string, Choice>, off: string[] = []): ReadyRule[] {
+// How each rule stands with the choices made so far.
+export function readiness(rows: ReviewRow[], choices: Record<string, Choice>): ReadyRule[] {
   const out: ReadyRule[] = []
-  for (const rule of ALL_RULES) {
-    if (off.includes(rule.id)) continue
-    if (rule.severity === 'pass') {
-      out.push({ rule, status: 'pass', note: 'Nothing to change.' })
-      continue
-    }
-    // Due dates are set in the dates step, so they are not a finding of the review.
-    if (rule.id === 'due-dates') {
-      out.push({ rule, status: 'fixed', note: 'Set in the Fix dates step.' })
+  for (const rule of DESIGN_RULES) {
+    if (rule.handled) {
+      out.push({ rule, status: 'fixed', note: rule.handled })
       continue
     }
     const hit = rows.filter((r) => r.findings.some((f) => f.rule.id === rule.id))
     if (hit.length === 0) {
-      // Rules that none of the review rows cover can only be fixed by hand, after the copy.
-      const where = rule.references?.length ? ` (${rule.references.join(', ')})` : ''
-      out.push({ rule, status: 'manual', note: `${rule.reason ?? rule.resources?.[0]?.reason ?? 'Needs a change in the course.'}${where}` })
+      out.push({ rule, status: 'pass', note: 'Nothing to change.' })
       continue
     }
-    const open = hit.filter((r) => !FIXED.includes(choiceOf(r, choices) as Choice))
-    out.push(
-      open.length === 0
-        ? { rule, status: 'fixed', note: `${hit.length === 1 ? hit[0].title : `${hit.length} items`} fixed or left out in the review.` }
-        : { rule, status: 'later', note: `${open.map((r) => r.title).join(', ')} to fix after the copy.` },
-    )
+    const kept = hit.filter((r) => choiceOf(r, choices) !== 'leave')
+    const onList = kept.filter((r) => choiceOf(r, choices) === 'fix')
+    const name = (list: ReviewRow[]) => (list.length === 1 ? list[0].title : `${list.length} items`)
+    if (kept.length === 0) out.push({ rule, status: 'fixed', note: `${name(hit)} left out of the copy.` })
+    else if (onList.length > 0) out.push({ rule, status: 'later', note: `${onList.map((r) => r.title).join(', ')} on your to-do list.` })
+    else out.push({ rule, status: 'open', note: `${name(kept.filter((r) => !onList.includes(r)))} copied as it is.` })
   }
   return out
 }
@@ -63,7 +54,6 @@ export const dimensionsOf = (list: ReadyRule[]) =>
 
 export const TODO_GROUPS = [
   'Fix after the copy',
-  'Read the AI fixes',
   'Do it yourself',
   'Set the dates',
   'Check after the copy',
@@ -85,58 +75,55 @@ export function openingLabel(o: Opening): string {
 export function buildTodo(args: {
   rows: ReviewRow[]
   choices: Record<string, Choice>
-  ready: ReadyRule[]
   dates: FixDatesState
   comments: EducatorComment[]
   opening: Opening
+  // The learning objects that are copied. Date entries are only for those.
+  included?: Included
 }): TodoItem[] {
-  const { rows, choices, ready, dates, comments, opening } = args
+  const { rows, choices, dates, comments, opening, included = all } = args
+  const dated = DATE_ITEMS.filter((i) => included(i.itemId))
+  const undated = NO_DATE_ITEMS.filter((i) => included(i.itemId))
   const todo: TodoItem[] = []
 
-  // The to-do list follows the readiness check: every check that is not ready or fixed in the copy is on the list.
-  // "Later" checks are the problems still in the course after the copy (kept, fix later, or not decided yet).
-  for (const x of ready.filter((r) => r.status === 'later')) {
-    todo.push({ group: 'Fix after the copy', title: x.rule.title.replace(/\.$/, ''), detail: x.note })
-  }
+  // Every item the educator chose to add to the to-do list is one entry, so the list grows with each choice.
+  // The title is the finding. The details say where to find it: the item, and the module it is in. An item can appear
+  // more than once when it has more than one finding.
+  const moduleNames = CONTENT_TYPES.find((c) => c.id === 'modules')!.items.map((m) => m.label)
   for (const r of rows) {
-    const c = choiceOf(r, choices)
-    // Items chosen to fix later that no design check covers, like a note from the team.
-    if (c === 'fix' && r.findings.length === 0) {
-      todo.push({ group: 'Fix after the copy', title: `${r.title} (${r.kindLabel})`, detail: r.note?.text ?? 'Chosen to fix after the copy.' })
+    if (choiceOf(r, choices) !== 'fix') continue
+    const where = r.courseWide ? 'Whole course' : `${r.title} (${r.kindLabel})${moduleNames.includes(r.group) ? `, in ${r.group}` : ''}`
+    // One entry for each finding of the item. The summary and the side panel list the item once, with its findings under it.
+    for (const f of r.findings.length ? r.findings : [undefined]) {
+      todo.push({ group: 'Fix after the copy', title: f ? f.detail : r.note?.text ?? 'Added to the to-do list.', detail: where, content: where, tag: f ? RULE_LABEL[f.rule.id] ?? f.rule.title : 'Team note', tone: f?.rule.severity === 'critical' ? 'error' : 'warning' })
     }
-    // An AI fix that was chosen with a review later.
-    if (c === 'aicheck' && r.aiFix) todo.push({ group: 'Read the AI fixes', title: r.title, detail: `${r.aiFix.what}. Check that it still fits.` })
-  }
-
-  for (const x of ready.filter((r) => r.status === 'manual')) {
-    todo.push({ group: 'Do it yourself', title: x.rule.title.replace(/\.$/, ''), detail: x.note })
   }
 
   // Comments about parts of the course the review does not list, like the gradebook.
   for (const c of comments.filter((c) => c.area === 'Gradebook')) {
-    todo.push({ group: 'Do it yourself', title: c.item, detail: c.text })
+    todo.push({ group: 'Do it yourself', title: c.text, detail: `${c.item} (${c.area})`, content: `${c.item} (${c.area})`, tag: c.area, tone: 'info' })
   }
 
   if (dates.mode === 'clear') {
-    todo.push({ group: 'Set the dates', title: 'Set the dates of all items', detail: `${DATE_ITEMS.length} items are copied with no date. They are listed on the course Settings page.` })
+    todo.push({ group: 'Set the dates', tag: 'No dates', tone: 'info', title: 'Set the dates of all items', detail: `${dated.length} items are copied with no date. They are listed on the course Settings page.` })
   } else {
-    for (const item of DATE_ITEMS) {
+    for (const item of dated) {
       const info = rowInfo(item, dates)
-      if (info.finalClosed) todo.push({ group: 'Set the dates', title: item.title, detail: `Still on ${fmtShort(info.final ?? info.base)}, a non-teaching day. Choose a new date.` })
+      if (info.finalClosed) todo.push({ group: 'Set the dates', tag: 'Non-teaching day', tone: 'warning', title: `Still on ${fmtShort(info.final ?? info.base)}. Choose a new date.`, detail: `${item.title} (${item.kind}), in ${item.module}`, content: `${item.title} (${item.kind}), in ${item.module}` })
     }
     // Items with no due date that were left empty are for the teacher to date later.
-    for (const item of NO_DATE_ITEMS) {
-      if ((dates.noDate[item.id] ?? 'empty') === 'empty') todo.push({ group: 'Set the dates', title: item.title, detail: 'It has no due date. Set one when you are ready.' })
+    for (const item of undated) {
+      if ((dates.noDate[item.id] ?? 'empty') === 'empty') todo.push({ group: 'Set the dates', tag: 'No due date', tone: 'info', title: 'Set one when you are ready.', detail: `${item.title} (${item.kind}), in ${item.module}`, content: `${item.title} (${item.kind}), in ${item.module}` })
     }
   }
 
   if (opening.mode === 'self') {
-    todo.push({ group: 'Check after the copy', title: 'Publish the course', detail: 'You chose to publish it manually. The course stays unpublished until you do.' })
+    todo.push({ group: 'Check after the copy', tag: 'Publish', tone: 'neutral', title: 'Publish the course', detail: 'You chose to publish it manually. The course stays unpublished until you do.' })
   }
   todo.push(
-    { group: 'Check after the copy', title: 'Quiz settings, gradebook and publish state', detail: 'Copying does not publish anything. Check them before students arrive.' },
-    { group: 'Check after the copy', title: 'Enrollments and groups', detail: 'Canvas never copies people. Add them to the new course.' },
-    { group: 'Check after the copy', title: 'Feature options', detail: 'Turn them on again in Settings.' },
+    { group: 'Check after the copy', tag: 'Check', tone: 'neutral', title: 'Quiz settings, gradebook and publish state', detail: 'Copying does not publish anything. Check them before students arrive.' },
+    { group: 'Check after the copy', tag: 'Check', tone: 'neutral', title: 'Enrollments and groups', detail: 'Canvas never copies people. Add them to the new course.' },
+    { group: 'Check after the copy', tag: 'Check', tone: 'neutral', title: 'Feature options', detail: 'Turn them on again in Settings.' },
   )
   return todo
 }
@@ -153,24 +140,29 @@ export function exportTodo(todo: TodoItem[], course: string) {
   URL.revokeObjectURL(url)
 }
 
-// Send the to-do list to the teacher's own email. It opens their mail app with the list filled in.
-export function emailTodo(todo: TodoItem[], course: string) {
-  const body = todo.map((t) => `- ${t.title}: ${t.detail}`).join('\n')
-  window.location.href = `mailto:?subject=${encodeURIComponent(`To do after copying ${course}`)}&body=${encodeURIComponent(body)}`
+// The pill of a to-do entry. An entry without its own tag (one from an older copy) gets one from its group.
+const GROUP_TAG: Record<string, { tag: string; tone: NonNullable<TodoItem['tone']> }> = {
+  'Fix after the copy': { tag: 'To fix', tone: 'warning' },
+  'Do it yourself': { tag: 'To do', tone: 'info' },
+  'Set the dates': { tag: 'Date', tone: 'info' },
+  'Check after the copy': { tag: 'Check', tone: 'neutral' },
+}
+export const tagOf = (x: TodoItem): { tag: string; tone: NonNullable<TodoItem['tone']> } | null =>
+  x.tag ? { tag: x.tag, tone: x.tone ?? 'neutral' } : GROUP_TAG[x.group] ?? null
+
+// The entries of one group, with the ones about the same part of the course together. An item with two problems is listed
+// once, with both problems under it. Entries with no content stay on their own.
+export function groupTodo(items: TodoItem[]): { content?: string; entries: TodoItem[] }[] {
+  const out: { content?: string; entries: TodoItem[] }[] = []
+  for (const x of items) {
+    const same = x.content ? out.find((g) => g.content === x.content) : undefined
+    if (same) same.entries.push(x)
+    else out.push({ content: x.content, entries: [x] })
+  }
+  return out
 }
 
-// Download the to-do list as calendar entries (.ics), one all-day entry for each item, starting tomorrow.
-export function calendarTodo(todo: TodoItem[], course: string) {
-  const day = new Date()
-  day.setDate(day.getDate() + 1)
-  const stamp = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  const esc = (x: string) => x.replace(/[,;\\]/g, (c) => `\\${c}`).replace(/\n/g, '\\n')
-  const events = todo.map((t, i) => ['BEGIN:VEVENT', `UID:todo-${i}@course-rollover`, `DTSTAMP:${stamp(new Date())}T000000Z`, `DTSTART;VALUE=DATE:${stamp(day)}`, `SUMMARY:${esc(t.title)}`, `DESCRIPTION:${esc(t.detail)}`, 'END:VEVENT'].join('\r\n'))
-  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Course Rollover//EN', ...events, 'END:VCALENDAR'].join('\r\n')
-  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `to-do-${course.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.ics`
-  a.click()
-  URL.revokeObjectURL(url)
-}
+// A copy that failed for one item: the reason is the text, and the fix is in the details.
+export const failedTodo = (f: { item: string; reason: string; fix: string }): TodoItem => ({
+  group: 'Fix after the copy', tag: 'Copy failed', tone: 'error', title: f.reason, detail: f.fix, content: f.item,
+})

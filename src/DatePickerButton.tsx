@@ -1,56 +1,87 @@
 import { useState } from 'react'
-import { Calendar, CalendarInstUIIcon, IconButton, Popover } from '@instructure/ui/v11_7'
+import { Button, CalendarInstUIIcon, DateTimeInput, IconButton, Popover, ScreenReaderContent, Text } from '@instructure/ui/v11_7'
 
-// A secondary icon button that opens the same calendar the date field uses (InstUI Calendar in a Popover). Days that are
-// not teaching days cannot be picked. `value` and what `onPick` returns are ISO dates (YYYY-MM-DD).
-
-// The calendar hands back full ISO strings in UTC, so a date is read as the local day it stands for.
-const isoDay = (iso: string) => iso.slice(0, 10)
-const dateOf = (iso: string) => (iso.length === 10 ? new Date(`${iso}T12:00:00`) : new Date(iso))
-const localIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+// A secondary icon button that opens a small window with InstUI DateTimeInput: a date (with its calendar) and a time.
+// Due times are in UTC, so the field works in UTC too. `value` is an ISO date (YYYY-MM-DD) and `time` is HH:MM in UTC.
+// The choice is only handed back when the educator chooses Apply.
 
 export default function DatePickerButton({
-  value, label, onPick,
+  value, time, label, onPick, onReset, canReset = false,
 }: {
   value: string
+  time: string
   // Screen reader label of the button, like "Change the date of Quiz 1".
   label: string
-  onPick: (iso: string) => void
+  onPick: (iso: string, time: string) => void
+  // Takes the date and time back to what they were before they were changed by hand.
+  onReset?: () => void
+  canReset?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const [month, setMonth] = useState(isoDay(value))
+  // The value being edited, as a UTC date-time. Not valid while the date or the time is incomplete.
+  const startValue = `${value}T${time}:00.000Z`
+  const [draft, setDraft] = useState<string | undefined>(startValue)
+  const close = () => setOpen(false)
   return (
     <Popover
       on="click"
       isShowingContent={open}
       onShowContent={() => {
-        setMonth(isoDay(value))
+        setDraft(startValue)
         setOpen(true)
       }}
-      onHideContent={() => setOpen(false)}
+      onHideContent={close}
       shouldContainFocus
       shouldReturnFocus
       placement="bottom end"
-      screenReaderLabel="Date picker"
+      screenReaderLabel="Date and time picker"
       renderTrigger={
         <IconButton size="small" screenReaderLabel={label}>
           <CalendarInstUIIcon />
         </IconButton>
       }
     >
-      <div style={{ padding: '0.5rem' }}>
-        <Calendar
-          visibleMonth={month}
-          currentDate={isoDay(value)}
-          selectedDate={isoDay(value)}
-          selectedLabel="Selected"
-          onRequestRenderNextMonth={(_e: unknown, requested: string) => setMonth(requested)}
-          onRequestRenderPrevMonth={(_e: unknown, requested: string) => setMonth(requested)}
-          onDateSelected={(iso: string) => {
-            onPick(localIso(dateOf(iso)))
-            setOpen(false)
+      <div style={{ padding: '1rem', width: '18rem', maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <DateTimeInput
+          description={<ScreenReaderContent>Date and time</ScreenReaderContent>}
+          dateRenderLabel={<Text weight="bold">Date</Text>}
+          timeRenderLabel={<Text weight="bold">Time (UTC)</Text>}
+          invalidDateTimeMessage="Enter a valid date and time"
+          screenReaderLabels={{
+            calendarIcon: 'Open calendar',
+            prevMonthButton: 'Previous month',
+            nextMonthButton: 'Next month',
+            datePickerDialog: 'Date picker',
+            selectedLabel: 'Selected',
           }}
+          layout="stacked"
+          timezone="UTC"
+          allowNonStepInput
+          value={draft}
+          onChange={(_e, iso) => setDraft(iso)}
         />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+          {onReset && (
+            <span style={{ marginInlineEnd: 'auto' }}>
+              <Button size="small" interaction={canReset ? 'enabled' : 'disabled'} onClick={() => { onReset(); close() }}>Reset</Button>
+            </span>
+          )}
+          <Button size="small" onClick={close}>Cancel</Button>
+          <Button
+            size="small"
+            color="primary"
+            interaction={draft ? 'enabled' : 'disabled'}
+            onClick={() => {
+              if (!draft) return
+              const at = new Date(draft)
+              const pad = (n: number) => String(n).padStart(2, '0')
+              onPick(`${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`, `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`)
+              close()
+            }}
+          >
+            Apply
+          </Button>
+        </div>
       </div>
     </Popover>
   )

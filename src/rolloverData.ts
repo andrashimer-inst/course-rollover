@@ -196,7 +196,9 @@ export const FAILED_ITEMS: { item: string; type: string; reason: string; fix: st
   { item: 'Final project rubric', type: 'Rubrics', reason: 'The rubric is shared with a course you cannot access.', fix: 'Ask the course owner to share it.' },
 ]
 
-export type TodoItem = { group: string; title: string; detail: string }
+// `content` is the part of the course the entry is about, for example an item and the module it is in. The summary shows it as a link.
+// `tag` is the short label shown as a pill before the text, and `tone` is its color.
+export type TodoItem = { group: string; title: string; detail: string; content?: string; tag?: string; tone?: 'error' | 'warning' | 'info' | 'neutral' }
 
 // One line of the copy history on the summary. Decisions are what the teacher chose, the rest is what Canvas did.
 export type HistoryEvent = {
